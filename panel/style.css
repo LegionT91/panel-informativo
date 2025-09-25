@@ -1,0 +1,113 @@
+body {
+			margin: 0;
+			font-family: 'Segoe UI', Arial, sans-serif;
+			background: #fff;
+		}
+		.header {
+			background: #353e82;
+			color: #fff;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 24px 40px 24px 32px;
+		}
+		.logo {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+		}
+		.logo-img {
+			width: 70px;
+			margin-bottom: 2px;
+		}
+		.logo-text {
+			font-size: 14px;
+			font-weight: 400;
+			margin-top: 2px;
+		}
+		.title {
+			font-size: 48px;
+			font-weight: bold;
+			letter-spacing: 2px;
+			text-align: center;
+			flex: 1;
+		}
+		.add-btn {
+			font-size: 56px;
+			font-weight: 300;
+			cursor: pointer;
+			user-select: none;
+		}
+		.news-container {
+			display: flex;
+			gap: 32px;
+			margin: 48px 0 0 48px;
+		}
+		.news-card {
+			position: relative;
+			width: 260px;
+			height: 220px;
+			border-radius: 20px;
+			overflow: hidden;
+			box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+			background: #222;
+			display: flex;
+			align-items: flex-end;
+		}
+		.news-img {
+			position: absolute;
+			top: 0; left: 0; right: 0; bottom: 0;
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			filter: brightness(0.7);
+		}
+		.news-text {
+			position: relative;
+			color: #fff;
+			font-size: 18px;
+			font-weight: 500;
+			padding: 0 16px 18px 16px;
+			z-index: 2;
+			text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+		}
+		.close-btn {
+			position: absolute;
+			top: 12px;
+			right: 16px;
+			font-size: 36px;
+			color: #fff;
+			background: rgba(0,0,0,0.25);
+			border: none;
+			border-radius: 50%;
+			width: 38px;
+			height: 38px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			z-index: 3;
+			transition: background 0.2s;
+		}
+		#boton {
+			font-size: 80px;
+			width: 80px;
+			height: 80px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			user-select: none;
+		}
+		.close-btn:hover {
+			background: rgba(53,62,130,0.8);
+		}
+		@media (max-width: 900px) {
+			.news-container {
+				flex-direction: column;
+				gap: 24px;
+				margin: 32px auto;
+				align-items: center;
+			}
+		}
