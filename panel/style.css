@@ -75,7 +75,7 @@ body {
 			position: absolute;
 			top: 12px;
 			right: 16px;
-			font-size: 36px;
+			font-size: 30px;
 			color: #fff;
 			background: rgba(0,0,0,0.25);
 			border: none;
@@ -90,15 +90,21 @@ body {
 			transition: background 0.2s;
 		}
 		#boton {
-			font-size: 80px;
-			width: 80px;
-			height: 80px;
+			font-size: 60px;
+			width: 50px;
+			height: 50px;
 			border-radius: 50%;
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			cursor: pointer;
 			user-select: none;
+			background-color: #353e82;
+			color: white;
+			border: none;
+			position: relative;
+			top: -5px;
+
 		}
 		.close-btn:hover {
 			background: rgba(53,62,130,0.8);
