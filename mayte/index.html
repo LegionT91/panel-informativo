@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Informativo - Príncipe de Gales</title>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:700,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="logo-area">
+            <img class="logo" src="img/logo.png" alt="Logo Colegio">
+            <div>
+                <div class="school-name">Complejo Educacional<br>Príncipe de Gales</div>
+            </div>
+        </div>
+        <div class="time" id="hora-actual"></div>
+        <div class="weather-area">
+            <span class="material-icons weather-icon">cloud</span>
+            <span class="material-icons weather-icon" style="font-size:32px;margin-left:-18px;">grain</span>
+            <span class="material-icons weather-icon" style="font-size:32px;margin-left:-18px;">grain</span>
+            <span class="date" id="fecha-actual"></span>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="main-card" style="background-image:url('https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg');">
+            <div class="main-card-text">
+                Se acerca el 18, con ello<br>
+                actividades recreativas<br>
+                ¡Pasalo chancho!
+            </div>
+        </div>
+        <div class="side-cards">
+            <div class="side-card" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Football_in_Bloomington%2C_Indiana%2C_1995.jpg/1200px-Football_in_Bloomington%2C_Indiana%2C_1995.jpg');">
+                <div class="side-card-overlay">
+                    <div class="side-card-date">02 de septiembre</div>
+                    <div class="side-card-title">
+                        Actividades Recreativas:<br>
+                        Campeonato de Futbol
+                    </div>
+                </div>
+            </div>
+            <div class="side-card" style="background-image:url('https://assets.megamediaradios.fm/sites/2/2023/06/sopaipillas-12-1300x975-1.jpeg');">
+                <div class="side-card-overlay">
+                    <div class="side-card-date">09 de septiembre</div>
+                    <div class="side-card-title">
+                        Venta de sopaipillas 3°<br>
+                        Administracion
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
