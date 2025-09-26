@@ -43,13 +43,13 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h1 class="modal-title fs-5" id="exampleModalLabel">Añadir Noticia</h1>
+		<h1 class="modal-title fs-5 text-center w-100" id="exampleModalLabel" style="text-align:center;">Añadir Noticia</h1>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
 				<form id="addNewsForm">
 					<div class="mb-3">
-						<label for="newsTitle" class="form-label" style="font-size:1.2em;">Titulo noticia:</label>
+						<label for="newsTitle" class="form-label" style="font-size:1.2em; display:block; text-align:center;">Título noticia:</label>
 						<textarea class="form-control" id="newsTitle" rows="2" placeholder="Escribe el título de la noticia" required></textarea>
 					</div>
 					<div class="row mb-3">
@@ -58,12 +58,12 @@
 							<input type="date" class="form-control" id="startDate" required>
 						</div>
 						<div class="col">
-							<label for="endDate" class="form-label">Fecha finalizacion:</label>
+							<label for="endDate" class="form-label">Fecha finalización:</label>
 							<input type="date" class="form-control" id="endDate" required>
 						</div>
 					</div>
 					<div class="mb-3 text-center">
-						<label for="newsImage" class="form-label" style="width:100%;font-size:1.3em;display:block;">Haga click para subir una imagen</label>
+						<label for="newsImage" class="form-label" style="width:100%;font-size:1.3em;display:block;">Haga clic para subir una imagen</label>
 						<input type="file" class="form-control" id="newsImage" accept="image/*" style="display:none;">
 						<div id="imagePreview" style="border:2px solid #ccc;border-radius:10px;padding:16px;cursor:pointer;display:inline-block;width:180px;height:140px;background:#f3f3f3;" onclick="document.getElementById('newsImage').click()">
 							<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" stroke="#888" stroke-width="2" viewBox="0 0 24 24" style="margin-top:20px;">
