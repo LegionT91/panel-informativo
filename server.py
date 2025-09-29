@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
 
@@ -13,6 +13,15 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+
+# Cuando un usuario no autorizado intenta acceder a una ruta protegida,
+# redirigimos al login y preservamos la ruta solicitada en el parámetro "next".
+@login_manager.unauthorized_handler
+def handle_needs_login():
+    # request might not be importable at top-level here; use redirect con next
+    from flask import request
+    return redirect(url_for('login', next=request.path))
+
 # Esta clase es un ejemplo simple, deberías usar una base de datos real
 class User(UserMixin):
     def __init__(self, id):
@@ -20,41 +29,52 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User(user_id)
+    # Solo cargar el usuario si la sesión indica que se autenticó correctamente.
+    from flask import session
+    if session.get('authenticated'):
+        return User(user_id)
+    return None
 
 @app.route('/')
+@app.route('/home')
 def home():
-    return render_template('home.html')
+    # Renderizar la página principal. Pasamos `avisos` por si la plantilla los utiliza.
+    return render_template('main_panel/home.html', avisos=avisos)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # obtener el destino al que volver después del login (si existe)
+    next_page = None
+    if request.method == 'GET':
+        next_page = request.args.get('next')
+
     if request.method == 'POST':
+        next_page = request.form.get('next') or request.args.get('next')
         # Aquí deberías verificar las credenciales del usuario
         username = request.form.get('username')
         password = request.form.get('password')
-        
-        # Este es un ejemplo simple, deberías verificar contra una base de datos
+
+        # Este es un ejemplo simple; usamos una contraseña maestra para acceder al panel
         if username == "admin" and password == "skebedeh":
             user = User(username)
             login_user(user)
-            return redirect(url_for('home'))
+            # Marcar en la sesión que el usuario se autenticó correctamente
+            session['authenticated'] = True
+            # Tras login exitoso ir al panel de administración o a `next` si fue provisto
+            if next_page and isinstance(next_page, str) and next_page.startswith('/'):
+                return redirect(next_page)
+            return redirect(url_for('panel'))
         else:
             flash('Credenciales inválidas')
-    
-    return render_template('login.html')
+
+    return render_template('login_panel/login.html', next=next_page)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        # Aquí deberías implementar la lógica de registro
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        # Aquí deberías guardar el usuario en una base de datos
-        flash('Registro exitoso')
-        return redirect(url_for('login'))
-    
-    return render_template('register.html')
+    # Actualmente no hay una plantilla de registro en el proyecto.
+    # Redirigimos a /login y mostramos un mensaje informativo.
+    flash('Registro no disponible. Usa las credenciales proporcionadas.')
+    return redirect(url_for('login'))
 
 @app.route('/panel/add', methods=['POST'])
 @login_required
@@ -144,13 +164,27 @@ def get_avisos():
 @app.route('/edit_panel')
 @login_required
 def edit_panel():
-    # Esta ruta requiere que el usuario esté autenticado
-    return render_template('edit_panel.html')
+    # Protección adicional por si el decorador no actúa (diagnóstico y seguridad)
+    if not current_user.is_authenticated or not session.get('authenticated'):
+        return redirect(url_for('login', next=request.path))
+    # Mostrar el panel de administración (plantilla existente)
+    return render_template('admin_panel/panel.html', avisos=avisos)
+
+
+# Página del panel (administración)
+@app.route('/panel')
+@login_required
+def panel():
+    if not current_user.is_authenticated or not session.get('authenticated'):
+        return redirect(url_for('login', next=request.path))
+    return render_template('admin_panel/panel.html', avisos=avisos)
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
+    # Limpiar la bandera de autenticación de la sesión
+    session.pop('authenticated', None)
     return redirect(url_for('home'))
 
 if __name__ == '__main__':
