@@ -15,23 +15,40 @@
 	<div class="header">
 		<div class="logo">
 			<img class="logo-img" src="https://complejoprincipedegales.cl/wp-content/uploads/2023/07/Logo-sin-fondo-3-e1729003593989.png" alt="Logo Colegio" />
-		</div>
-		<div class="title">PANEL DE NOTICIAS</div>
-<button type="button" class="btn btn-primary" id="boton" data-bs-toggle="modal" data-bs-target="#exampleModal" aria-label="Añadir noticia" title="Añadir noticia" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;">
-	<!-- Icono + (SVG) -->
-	<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:white;">
-		<line x1="12" y1="5" x2="12" y2="19"></line>
-		<line x1="5" y1="12" x2="19" y2="12"></line>
-	</svg>
-	<span class="visually-hidden">Añadir noticia</span>
-</button>
-	</div>
+			</div>
+			<div class="title">PANEL DE NOTICIAS</div>
+			<!-- Botón para abrir modal de añadir noticia, más grande y blanco, sin fondo -->
+			<button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#exampleModal" style="margin-left:12px; display:flex; align-items:center; gap:8px; border:none; background:transparent; padding:0;">
+				<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+					<line x1="12" y1="5" x2="12" y2="19"></line>
+					<line x1="5" y1="12" x2="19" y2="12"></line>
+				</svg>
+				<span class="visually-hidden">Añadir noticia</span>
+			</button>
+			</div>
 	<div class="news-container">
+		<!-- Mostrar mensajes flash del servidor -->
+		{% with messages = get_flashed_messages() %}
+		  {% if messages %}
+		    <div class="container mt-3">
+		      {% for msg in messages %}
+		        <div class="alert alert-info">{{ msg }}</div>
+		      {% endfor %}
+		    </div>
+		  {% endif %}
+		{% endwith %}
 		{% if avisos %}
 			{% for aviso in avisos %}
 			<div class="news-card" id="aviso-{{ aviso.id }}">
 				<img class="news-img" src="{{ aviso.image_url if aviso.image_url else url_for('static', filename='logo.png') }}" alt="{{ aviso.title }}" />
 				<button class="close-btn" title="Eliminar noticia" data-aviso-id="{{ aviso.id }}">&times;</button>
+				<button class="edit-btn" title="Editar noticia" data-aviso-id="{{ aviso.id }}" style="position:absolute;right:56px;top:8px;"> 
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">
+						<path d="M12 20h9"></path>
+						<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+					</svg>
+					<span class="visually-hidden">Editar</span>
+				</button>
 				<div class="news-text">{{ aviso.title }}</div>
 			</div>
 			{% endfor %}
@@ -86,6 +103,47 @@
   </div>
 </div>
 
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h1 class="modal-title fs-5" id="editModalLabel">Editar Noticia</h1>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+						<form id="editNewsForm">
+							<input type="hidden" id="editId" name="id">
+							<div class="mb-3">
+								<label for="editTitle" class="form-label">Título</label>
+								<textarea class="form-control" id="editTitle" name="title" rows="2" required></textarea>
+							</div>
+							<div class="mb-3 text-center">
+								<label for="editImageFile" class="form-label">Subir nueva imagen</label>
+								<input type="file" class="form-control" id="editImageFile" name="photo" accept="image/*">
+								<div id="editImagePreview" style="margin-top:8px;"></div>
+								<div class="form-text">Si seleccionas un archivo, se subirá y reemplazará la imagen del aviso.</div>
+							</div>
+					<div class="row mb-3">
+						<div class="col">
+							<label for="editStart" class="form-label">Fecha inicio</label>
+							<input type="datetime-local" class="form-control" id="editStart" name="fecha_inicio">
+						</div>
+						<div class="col">
+							<label for="editEnd" class="form-label">Fecha fin</label>
+							<input type="datetime-local" class="form-control" id="editEnd" name="fecha_fin">
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+				<button type="button" class="btn btn-primary" id="saveEditBtn">Guardar cambios</button>
+			</div>
+		</div>
+	</div>
+</div>
+
 <script>
 // Vista previa de imagen
 document.addEventListener('DOMContentLoaded', function() {
@@ -136,24 +194,68 @@ async function fetchAndRenderAvisos() {
 	try {
 		const res = await fetch('/panel/avisos');
 		if (!res.ok) return;
-		const avisos = await res.json();
+		let avisos = await res.json();
 		const container = document.querySelector('.news-container');
 		if (!container) return;
 		if (!Array.isArray(avisos) || avisos.length === 0) {
 			container.innerHTML = '<div class="alert alert-info">No hay noticias registradas en la base de datos.</div>';
 			return;
 		}
+		// Ordenar por fecha_inicio descendente - parsing robusto para distintos formatos
+		const parseISOtoMs = (s) => {
+			if (!s) return 0;
+			// Si es ya un número
+			if (typeof s === 'number') return s;
+			// Algunos formatos pueden venir como 'YYYY-MM-DD HH:MM:SS' o 'YYYY-MM-DDTHH:MM' (sin segundos)
+			let str = String(s).trim();
+			// Reemplazar espacio entre fecha y hora por 'T'
+			if (str.indexOf(' ') > 0 && str.indexOf('T') === -1) {
+				str = str.replace(' ', 'T');
+			}
+			// Si tiene formato 'YYYY-MM-DDTHH:MM' añadir segundos
+			const timePart = str.split('T')[1];
+			if (timePart && timePart.length === 5) {
+				str = str + ':00';
+			}
+			const ms = Date.parse(str);
+			if (!isNaN(ms)) return ms;
+			// Fallback: try replacing space with 'T' and parse again
+			try {
+				return new Date(str).getTime() || 0;
+			} catch (e) {
+				return 0;
+			}
+		};
+
+		// Orden relativo: primero los avisos que ya comenzaron (más recientes primero),
+		// luego los futuros (los más cercanos primero).
+		const now = Date.now();
+		const parsed = avisos.map(a => ({ ...a, _ms: parseISOtoMs(a.fecha_inicio) }));
+		// Tratar fechas inválidas como +Inf para que queden al final
+		parsed.forEach(p => {
+			if (!p._ms || isNaN(p._ms)) p._ms = Infinity;
+		});
+		const started = parsed.filter(p => p._ms <= now).sort((a, b) => b._ms - a._ms);
+		const future = parsed.filter(p => p._ms > now).sort((a, b) => a._ms - b._ms);
+		avisos = started.concat(future);
 		const logoUrl = '{{ url_for("static", filename="logo.png") }}';
 		container.innerHTML = avisos.map(aviso => {
-			const img = aviso.image_url && aviso.image_url !== '' ? aviso.image_url : logoUrl;
-			const escapedTitle = (aviso.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-			return `
-				<div class="news-card" id="aviso-${aviso.id}">
-					<img class="news-img" src="${img}" alt="${escapedTitle}" />
-					<button class="close-btn" title="Eliminar noticia" onclick="deleteAviso(${aviso.id})">&times;</button>
-					<div class="news-text">${escapedTitle}</div>
-				</div>`;
-		}).join('\n');
+				const img = aviso.image_url && aviso.image_url !== '' ? aviso.image_url : logoUrl;
+				const escapedTitle = (aviso.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+				return `
+					<div class="news-card" id="aviso-${aviso.id}" style="position:relative;">
+						<img class="news-img" src="${img}" alt="${escapedTitle}" />
+						<button class="close-btn" title="Eliminar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:8px;top:8px;">&times;</button>
+						<button class="edit-btn" title="Editar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:56px;top:8px;">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">
+								<path d="M12 20h9"></path>
+								<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+							</svg>
+							<span class="visually-hidden">Editar</span>
+						</button>
+						<div class="news-text">${escapedTitle}</div>
+					</div>`;
+			}).join('\n');
 	} catch (err) {
 		console.error('Error cargando avisos:', err);
 	}
@@ -164,6 +266,26 @@ document.addEventListener('DOMContentLoaded', function() {
 	fetchAndRenderAvisos();
 	setInterval(fetchAndRenderAvisos, 10000);
 });
+// Mostrar vista previa cuando se seleccione un fichero en el modal de edición
+const editFileInputGlobal = document.getElementById('editImageFile');
+if (editFileInputGlobal) {
+	editFileInputGlobal.addEventListener('change', function(e) {
+		const previewEl = document.getElementById('editImagePreview');
+		previewEl.innerHTML = '';
+		if (e.target.files && e.target.files[0]) {
+			const reader = new FileReader();
+			reader.onload = function(ev) {
+				const img = document.createElement('img');
+				img.src = ev.target.result;
+				img.style.maxWidth = '180px';
+				img.style.maxHeight = '100px';
+				img.style.borderRadius = '8px';
+				previewEl.appendChild(img);
+			};
+			reader.readAsDataURL(e.target.files[0]);
+		}
+	});
+}
 </script>
 <script>
 // Delegación de eventos para los botones de eliminar (maneja elementos generados dinámicamente)
@@ -177,6 +299,156 @@ document.addEventListener('click', function(e) {
 		deleteAviso(id);
 	}
 });
+</script>
+<script>
+// Edit modal handling
+document.addEventListener('click', function(e) {
+	const editBtn = e.target.closest && e.target.closest('.edit-btn');
+	if (!editBtn) return;
+	const id = editBtn.getAttribute('data-aviso-id');
+	if (!id) return;
+	openEditModal(id);
+});
+
+async function openEditModal(id) {
+	// Obtener datos del aviso desde la API
+	try {
+		const res = await fetch('/panel/avisos');
+		if (!res.ok) throw new Error('No se pudo cargar avisos');
+		const list = await res.json();
+		const aviso = list.find(a => String(a.id) === String(id));
+		if (!aviso) {
+			alert('Aviso no encontrado');
+			return;
+		}
+
+		// Rellenar formulario
+	document.getElementById('editId').value = aviso.id || '';
+	document.getElementById('editTitle').value = aviso.title || '';
+			// Mostrar vista previa de la imagen actual si existe
+			const previewEl = document.getElementById('editImagePreview');
+			previewEl.innerHTML = '';
+			if (aviso.image_url) {
+				const img = document.createElement('img');
+				img.src = aviso.image_url;
+				img.style.maxWidth = '180px';
+				img.style.maxHeight = '100px';
+				img.style.borderRadius = '8px';
+				previewEl.appendChild(img);
+			}
+			// Limpiar input file si existe
+			const editFileInput = document.getElementById('editImageFile');
+			if (editFileInput) editFileInput.value = '';
+		// Convertir ISO a formato datetime-local si existe
+		const toLocal = (iso) => {
+			if (!iso) return '';
+			const d = new Date(iso);
+			// Ajustar tz para que coincida con input datetime-local
+			const tzOffset = d.getTimezoneOffset() * 60000;
+			const local = new Date(d.getTime() - tzOffset);
+			return local.toISOString().slice(0,16);
+		};
+		document.getElementById('editStart').value = toLocal(aviso.fecha_inicio);
+		document.getElementById('editEnd').value = toLocal(aviso.fecha_fin);
+
+		// Mostrar modal
+		const editModalEl = document.getElementById('editModal');
+		const modal = new bootstrap.Modal(editModalEl);
+		modal.show();
+
+		// Guardar botón
+		const saveBtn = document.getElementById('saveEditBtn');
+		saveBtn.onclick = async function() {
+			await submitEdit(modal);
+		};
+
+	} catch (err) {
+		console.error(err);
+		alert('Error cargando aviso: ' + err.message);
+	}
+}
+
+async function submitEdit(modalInstance) {
+	// Validar elementos del DOM antes de usarlos
+	const idEl = document.getElementById('editId');
+	const titleEl = document.getElementById('editTitle');
+	const startEl = document.getElementById('editStart');
+	const endEl = document.getElementById('editEnd');
+
+	if (!idEl) { alert('ID del aviso no disponible'); return; }
+	if (!titleEl) { alert('Campo título no disponible'); return; }
+
+	const id = idEl.value;
+	const title = titleEl.value.trim();
+	const fecha_inicio = startEl ? (startEl.value || null) : null;
+	const fecha_fin = endEl ? (endEl.value || null) : null;
+
+	if (!title) { alert('El título no puede estar vacío'); return; }
+
+	// Si hay archivo seleccionado, subirlo vía FormData al endpoint específico y salir.
+	const fileInput = document.getElementById('editImageFile');
+	if (fileInput && fileInput.files && fileInput.files.length > 0) {
+		const fd = new FormData();
+		fd.append('photo', fileInput.files[0]);
+		if (title) fd.append('title', title);
+		if (fecha_inicio) fd.append('fecha_inicio', fecha_inicio);
+		if (fecha_fin) fd.append('fecha_fin', fecha_fin);
+		try {
+			const res = await fetch(`/panel/upload_image/${id}`, { method: 'POST', body: fd });
+			const contentType = (res.headers.get('content-type') || '').toLowerCase();
+			let data = null;
+			if (contentType.includes('application/json')) {
+				data = await res.json();
+			} else {
+				const text = await res.text();
+				console.error('Respuesta no-JSON al subir imagen:', text.slice(0,1000));
+				alert('Respuesta inesperada del servidor al subir imagen. Revisa el servidor o tu sesión.');
+				return;
+			}
+			if (!res.ok) {
+				alert('Error al subir imagen: ' + (data && data.error ? data.error : JSON.stringify(data)));
+				return;
+			}
+			modalInstance.hide();
+			await fetchAndRenderAvisos();
+			alert('Imagen subida y aviso actualizado');
+			return;
+		} catch (err) {
+			console.error(err);
+			alert('Error de red al subir imagen: ' + err.message + '. Si ves HTML en la consola del navegador, puede que la sesión haya expirado y el servidor esté devolviendo la página de login.');
+			return;
+		}
+	}
+
+	// Si no hay archivo, actualizar solo metadatos vía PUT
+	const payload = { title };
+	if (fecha_inicio) payload.fecha_inicio = fecha_inicio;
+	if (fecha_fin) payload.fecha_fin = fecha_fin;
+
+		try {
+			const res = await fetch(`/panel/edit/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+			const contentType2 = (res.headers.get('content-type') || '').toLowerCase();
+			let data2 = null;
+			if (contentType2.includes('application/json')) {
+				data2 = await res.json();
+			} else {
+				const text = await res.text();
+				console.error('Respuesta no-JSON al guardar aviso:', text.slice(0,1000));
+				alert('Respuesta inesperada del servidor al guardar. Revisa si tu sesión es válida o mira la consola del servidor.');
+				return;
+			}
+			if (!res.ok) {
+				alert('Error al guardar: ' + (data2 && data2.error ? data2.error : JSON.stringify(data2)));
+				return;
+			}
+			modalInstance.hide();
+			await fetchAndRenderAvisos();
+			alert('Aviso actualizado');
+		} catch (err) {
+			console.error(err);
+			alert('Error de red: ' + err.message);
+		}
+}
 </script>
 </body>
 </html>
