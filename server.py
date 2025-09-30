@@ -385,19 +385,25 @@ def upload_news():
 
         start_sql = fmt_mysql(fecha_inicio)
         end_sql = fmt_mysql(fecha_fin)
-
         # Intentar insertar incluyendo el nombre del archivo en la columna image_url (si existe en la tabla)
         try:
             if filename:
-                db.query_db('INSERT INTO notice (name_notice, start_date, end_date, image_url) VALUES (%(name)s, %(start)s, %(end)s, %(img)s)',
-                            {'name': title, 'start': start_sql, 'end': end_sql, 'img': filename})
+                image_url_db = f'static/uploads/{filename}'
+                db.query_db(
+                    'INSERT INTO notice (name_notice, start_date, end_date, image_url) VALUES (%(name)s, %(start)s, %(end)s, %(img)s)',
+                    {'name': title, 'start': start_sql, 'end': end_sql, 'img': image_url_db}
+                )
             else:
-                db.query_db('INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
-                            {'name': title, 'start': start_sql, 'end': end_sql})
+                db.query_db(
+                    'INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
+                    {'name': title, 'start': start_sql, 'end': end_sql}
+                )
         except Exception:
             # Fallback por si la tabla no tiene columna image_url
-            db.query_db('INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
-                        {'name': title, 'start': start_sql, 'end': end_sql})
+            db.query_db(
+                'INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
+                {'name': title, 'start': start_sql, 'end': end_sql}
+            )
 
         # Obtener la última fila insertada
         row = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 1')
@@ -408,17 +414,18 @@ def upload_news():
             'id': inserted['idnotice'] if inserted else (len(avisos) + 1),
             'title': title,
             'description': request.form.get('description', ''),
-            'image_url': image_url,
+            'image_url': f'static/uploads/{filename}' if filename else '',
             'fecha_inicio': fecha_inicio,
             'fecha_fin': fecha_fin,
             'created_at': datetime.now().isoformat(),
         }
         avisos.append(nuevo_aviso)
         flash('Noticia añadida correctamente')
+        return redirect(url_for('panel'))
     except Exception as e:
         flash(f'Error al guardar en la base de datos: {e}')
 
-    return redirect(url_for('panel'))
+        return redirect(url_for('panel'))
 
 
 if __name__ == '__main__':
