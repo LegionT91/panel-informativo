@@ -17,14 +17,25 @@
 			<img class="logo-img" src="https://complejoprincipedegales.cl/wp-content/uploads/2023/07/Logo-sin-fondo-3-e1729003593989.png" alt="Logo Colegio" />
 			</div>
 			<div class="title">PANEL DE NOTICIAS</div>
-			<!-- Botón para abrir modal de añadir noticia, más grande y blanco, sin fondo -->
-			<button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#exampleModal" style="margin-left:12px; display:flex; align-items:center; gap:8px; border:none; background:transparent; padding:0;">
-				<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-					<line x1="12" y1="5" x2="12" y2="19"></line>
-					<line x1="5" y1="12" x2="19" y2="12"></line>
-				</svg>
-				<span class="visually-hidden">Añadir noticia</span>
-			</button>
+			<div style="display: flex; align-items: center; gap: 12px;">
+				<!-- Botón para abrir modal de añadir noticia -->
+				<button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#exampleModal" style="display:flex; align-items:center; gap:8px; border:none; background:transparent; padding:0;">
+					<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+						<line x1="12" y1="5" x2="12" y2="19"></line>
+						<line x1="5" y1="12" x2="19" y2="12"></line>
+					</svg>
+					<span class="visually-hidden">Añadir noticia</span>
+				</button>
+				<!-- Botón de cerrar sesión -->
+				<a href="/logout" class="btn btn-outline-light" style="display:flex; align-items:center; gap:8px;">
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+						<polyline points="16 17 21 12 16 7"></polyline>
+						<line x1="21" y1="12" x2="9" y2="12"></line>
+					</svg>
+					Cerrar Sesión
+				</a>
+			</div>
 			</div>
 	<div class="news-container">
 		<!-- Mostrar mensajes flash del servidor -->
@@ -449,6 +460,54 @@ async function submitEdit(modalInstance) {
 			alert('Error de red: ' + err.message);
 		}
 }
+</script>
+<script>
+// Auto-logout por inactividad: 4 minutos (240000 ms)
+(function() {
+	const INACTIVITY_LIMIT = 4 * 60 * 1000; // 4 minutos
+	let idleTimer = null;
+
+	function logoutNow() {
+		// Llamar a /logout en el servidor para limpiar la sesión y luego ir al login
+		try {
+			fetch('/logout', { method: 'GET', credentials: 'same-origin' })
+				.catch(err => console.warn('Error al llamar /logout:', err))
+				.finally(() => {
+					// Redirigir al login para pedir credenciales de nuevo
+					try {
+						window.location.href = '/login';
+					} catch (e) {
+						console.error('Error al redirigir al login tras logout:', e);
+					}
+				});
+		} catch (e) {
+			console.error('Error al iniciar logout:', e);
+			try { window.location.href = '/login'; } catch (e2) {}
+		}
+	}
+
+	function resetIdleTimer() {
+		if (idleTimer) clearTimeout(idleTimer);
+		idleTimer = setTimeout(logoutNow, INACTIVITY_LIMIT);
+	}
+
+	// Eventos que consideramos actividad del usuario
+	const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+	function addActivityListeners() {
+		events.forEach(ev => document.addEventListener(ev, resetIdleTimer, {passive: true}));
+		// Cuando la pestaña recupere el foco, reiniciamos
+		window.addEventListener('focus', resetIdleTimer);
+		document.addEventListener('visibilitychange', function() {
+			if (!document.hidden) resetIdleTimer();
+		});
+	}
+
+	// Inicializar
+	document.addEventListener('DOMContentLoaded', function() {
+		addActivityListeners();
+		resetIdleTimer();
+	});
+})();
 </script>
 </body>
 </html>

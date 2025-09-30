@@ -28,6 +28,8 @@ avisos = []
 # Configuración de Flask-Login
 login_manager = LoginManager()
 login_manager.login_view = 'login'
+login_manager.login_message = 'Por favor inicie sesión para acceder a esta página'
+login_manager.login_message_category = 'warning'
 login_manager.init_app(app)
 
 
@@ -44,6 +46,9 @@ def require_login_for_panel():
 
     # Si la ruta comienza con /panel y no está en la lista pública, forzar login
     if path.startswith('/panel') and path not in public_panel_paths:
+        # Si el usuario no está autenticado, redirigir al login
+        if not current_user.is_authenticated:
+            return redirect(url_for('login', next=request.url))
         # Evitar bucles al redirigir si ya estamos en la página de login
         if path == url_for('login'):
             return None
@@ -90,6 +95,13 @@ def load_user(user_id):
 def home():
     # Renderizar la página principal. Pasamos `avisos` por si la plantilla los utiliza.
     return render_template('main_panel/home.html', avisos=avisos)
+
+@app.route('/panel')
+@login_required
+def panel():
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
+    return render_template('admin_panel/panel.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -360,13 +372,7 @@ def edit_panel():
     return render_template('admin_panel/panel.html', avisos=avisos)
 
 
-# Página del panel (administración)
-@app.route('/panel')
-@login_required
-def panel():
-    if not current_user.is_authenticated:
-        return redirect(url_for('login', next=request.path))
-    # Obtener avisos desde la BD para mostrarlos
+# Otras rutas y funciones del panel
     try:
         db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
         rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
