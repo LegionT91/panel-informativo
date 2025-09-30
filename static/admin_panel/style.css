@@ -39,14 +39,17 @@ body {
 			user-select: none;
 		}
 		.news-container {
-			display: flex;
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 			gap: 32px;
-			margin: 48px 0 0 48px;
+			margin: 48px;
+			padding-right: 48px;
+			width: calc(100% - 96px);
 		}
 		.news-card {
 			position: relative;
-			width: 260px;
-			height: 220px;
+			width: 100%;
+			aspect-ratio: 6/5;
 			border-radius: 20px;
 			overflow: hidden;
 			box-shadow: 0 4px 16px rgba(0,0,0,0.15);
