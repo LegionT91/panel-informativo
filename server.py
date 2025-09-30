@@ -1,17 +1,34 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
+import os
+
+# Usar el helper mysqlconnection.py (pymysql)
+from mysqlconnection import connectToMySQL
+
+# Password hashing
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'popipopipopopipo'  # Clave super secreta para sesiones
+
+# Carpeta para subir imágenes (relativa a la carpeta raíz de la app)
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'static/uploads')
+# Extensiones permitidas (opcional, se puede ampliar)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Clave maestra requerida para crear usuarios desde el formulario de registro.
+# Se puede sobreescribir con la variable de entorno MASTER_KEY si se desea.
+MASTER_KEY = os.environ.get('MASTER_KEY', 'complejoprincipedegalescuenta25')
 
 # Lista temporal para almacenar los avisos (en producción usar una base de datos)
 avisos = []
 
 # Configuración de Flask-Login
 login_manager = LoginManager()
-login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.init_app(app)
 
 
 # Cuando un usuario no autorizado intenta acceder a una ruta protegida,
@@ -20,19 +37,29 @@ login_manager.login_view = 'login'
 def handle_needs_login():
     # request might not be importable at top-level here; use redirect con next
     from flask import request
-    return redirect(url_for('login', next=request.path))
+    # Usar la URL completa como destino "next" para preservar querystring si existe
+    return redirect(url_for('login', next=request.url))
 
 # Esta clase es un ejemplo simple, deberías usar una base de datos real
 class User(UserMixin):
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, username):
+        # Usamos el nombre de usuario como identificador
+        self.username = username
+        self.id = username
+
+    def get_id(self):
+        return self.username
 
 @login_manager.user_loader
 def load_user(user_id):
-    # Solo cargar el usuario si la sesión indica que se autenticó correctamente.
-    from flask import session
-    if session.get('authenticated'):
-        return User(user_id)
+    # Cargar el usuario consultando la tabla `usuarios`.
+    try:
+        db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+        rows = db.query_db('SELECT * FROM usuarios WHERE username = %(username)s', {'username': user_id})
+        if rows:
+            return User(user_id)
+    except Exception:
+        pass
     return None
 
 @app.route('/')
@@ -54,27 +81,64 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        # Este es un ejemplo simple; usamos una contraseña maestra para acceder al panel
-        if username == "admin" and password == "skebedeh":
-            user = User(username)
-            login_user(user)
-            # Marcar en la sesión que el usuario se autenticó correctamente
-            session['authenticated'] = True
-            # Tras login exitoso ir al panel de administración o a `next` si fue provisto
-            if next_page and isinstance(next_page, str) and next_page.startswith('/'):
-                return redirect(next_page)
-            return redirect(url_for('panel'))
-        else:
-            flash('Credenciales inválidas')
+        # Validar contra la tabla `usuarios` en MySQL usando el helper connectToMySQL
+        try:
+            db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+            rows = db.query_db('SELECT * FROM usuarios WHERE username = %(username)s', {'username': username})
+            row = rows[0] if rows else None
+
+            if row and check_password_hash(row['password'], password):
+                user = User(row['username'])
+                login_user(user)
+                # No hacer la sesión permanente: que expire al cerrar el navegador
+                session.permanent = False
+                if next_page and isinstance(next_page, str) and next_page.startswith('/'):
+                    return redirect(next_page)
+                return redirect(url_for('panel'))
+            else:
+                flash('Credenciales inválidas')
+        except Exception as e:
+            flash(f'Error al conectar con la base de datos: {e}')
 
     return render_template('login_panel/login.html', next=next_page)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    # Actualmente no hay una plantilla de registro en el proyecto.
-    # Redirigimos a /login y mostramos un mensaje informativo.
-    flash('Registro no disponible. Usa las credenciales proporcionadas.')
-    return redirect(url_for('login'))
+    # Registro usando MySQL
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        master_key = request.form.get('master_key')
+        email = request.form.get('email')
+
+        if not username or not password:
+            flash('Debe proporcionar usuario y contraseña')
+            return redirect(url_for('register'))
+
+        # validar clave maestra
+        if master_key != MASTER_KEY:
+            flash('Clave maestra incorrecta')
+            return redirect(url_for('register'))
+
+        hashed = generate_password_hash(password)
+
+        # Conectar a la base de datos
+        try:
+            db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+            existing = db.query_db('SELECT id FROM usuarios WHERE username = %(username)s', {'username': username})
+            if existing:
+                flash('El nombre de usuario ya existe')
+                return redirect(url_for('register'))
+
+            db.query_db('INSERT INTO usuarios (username, password, email, created_at, updated_at) VALUES (%(username)s, %(password)s, %(email)s, NOW(), NOW())',
+                        {'username': username, 'password': hashed, 'email': email})
+            flash('Registro exitoso. Ya puedes ingresar.')
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash(f'Error al conectar con la base de datos: {e}')
+            return redirect(url_for('register'))
+
+    return render_template('registrer_panel/registrer.html')
 
 @app.route('/panel/add', methods=['POST'])
 @login_required
@@ -146,26 +210,70 @@ def edit_aviso(aviso_id):
 @app.route('/panel/delete/<int:aviso_id>', methods=['DELETE'])
 @login_required
 def delete_aviso(aviso_id):
+    # Intentar eliminar desde la base de datos y borrar la imagen asociada si existe
+    try:
+        db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+        rows = db.query_db('SELECT * FROM notice WHERE idnotice = %(id)s', {'id': aviso_id})
+        if not rows:
+            return jsonify({"error": "Aviso no encontrado"}), 404
+        row = rows[0]
+        # Si existe imagen asociada, borrarla del disco
+        img_field = row.get('image_url') if 'image_url' in row else None
+        if img_field:
+            filename = os.path.basename(img_field)
+            upload_folder = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+            file_path = os.path.join(upload_folder, filename)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+        # Borrar la fila en la BD
+        db.query_db('DELETE FROM notice WHERE idnotice = %(id)s', {'id': aviso_id})
+    except Exception as e:
+        return jsonify({'error': f'Error al eliminar en la base de datos: {e}'}), 500
+
+    # También quitar de la memoria si estaba
     aviso_index = next((index for (index, aviso) in enumerate(avisos) if aviso['id'] == aviso_id), None)
-    
-    if aviso_index is None:
-        return jsonify({"error": "Aviso no encontrado"}), 404
-    
-    if avisos[aviso_index]['author'] != current_user.id:
-        return jsonify({"error": "No autorizado para eliminar este aviso"}), 403
-    
-    aviso_eliminado = avisos.pop(aviso_index)
-    return jsonify(aviso_eliminado)
+    aviso_eliminado = None
+    if aviso_index is not None:
+        aviso_eliminado = avisos.pop(aviso_index)
+
+    return jsonify({'deleted': aviso_id, 'removed_from_memory': aviso_eliminado is not None})
 
 @app.route('/panel/avisos', methods=['GET'])
 def get_avisos():
-    return jsonify(avisos)
+    try:
+        db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+        rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
+        # Mapear campos a la estructura esperada
+        mapped = []
+        for r in rows:
+            def fmt_field(dt):
+                if not dt:
+                    return None
+                try:
+                    return dt.isoformat()
+                except Exception:
+                    return str(dt)
+
+            mapped.append({
+                'id': r.get('idnotice'),
+                'title': r.get('name_notice'),
+                'description': r.get('description') if 'description' in r else '',
+                'image_url': r.get('image_url') if 'image_url' in r else '',
+                'fecha_inicio': fmt_field(r.get('start_date')),
+                'fecha_fin': fmt_field(r.get('end_date')),
+            })
+        return jsonify(mapped)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/edit_panel')
 @login_required
 def edit_panel():
     # Protección adicional por si el decorador no actúa (diagnóstico y seguridad)
-    if not current_user.is_authenticated or not session.get('authenticated'):
+    if not current_user.is_authenticated:
         return redirect(url_for('login', next=request.path))
     # Mostrar el panel de administración (plantilla existente)
     return render_template('admin_panel/panel.html', avisos=avisos)
@@ -175,17 +283,151 @@ def edit_panel():
 @app.route('/panel')
 @login_required
 def panel():
-    if not current_user.is_authenticated or not session.get('authenticated'):
+    if not current_user.is_authenticated:
         return redirect(url_for('login', next=request.path))
-    return render_template('admin_panel/panel.html', avisos=avisos)
+    # Obtener avisos desde la BD para mostrarlos
+    try:
+        db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+        rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
+        mapped = []
+        for r in rows:
+            def fmt_field(dt):
+                if not dt:
+                    return None
+                try:
+                    return dt.isoformat()
+                except Exception:
+                    return str(dt)
+
+            mapped.append({
+                'id': r.get('idnotice'),
+                'title': r.get('name_notice'),
+                'description': r.get('description') if 'description' in r else '',
+                'image_url': r.get('image_url') if 'image_url' in r else '',
+                'fecha_inicio': fmt_field(r.get('start_date')),
+                'fecha_fin': fmt_field(r.get('end_date')),
+            })
+        return render_template('admin_panel/panel.html', avisos=mapped)
+    except Exception as e:
+        flash(f'Error cargando avisos desde la base de datos: {e}')
+        return render_template('admin_panel/panel.html', avisos=avisos)
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     # Limpiar la bandera de autenticación de la sesión
-    session.pop('authenticated', None)
+    # Borrar toda la sesión para asegurarnos de que no quede información
+    session.clear()
     return redirect(url_for('home'))
 
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/panel/upload', methods=['POST'])
+@login_required
+def upload_news():
+    # Validar presencia de archivo
+    if 'photo' not in request.files:
+        flash('No se ha enviado ninguna imagen')
+        return redirect(url_for('panel'))
+
+    file = request.files['photo']
+    title = request.form.get('title')
+    fecha_inicio = request.form.get('fecha_inicio')
+    fecha_fin = request.form.get('fecha_fin')
+
+    if not title or not fecha_inicio or not fecha_fin:
+        flash('Debe completar título, fecha de inicio y fecha de fin')
+        return redirect(url_for('panel'))
+
+    # Validar fechas
+    try:
+        inicio = datetime.fromisoformat(fecha_inicio)
+        fin = datetime.fromisoformat(fecha_fin)
+        if fin <= inicio:
+            flash('La fecha de fin debe ser posterior a la fecha de inicio')
+            return redirect(url_for('panel'))
+    except ValueError:
+        flash('Formato de fecha inválido')
+        return redirect(url_for('panel'))
+
+    # Manejar archivo y ruta pública
+    filename = None
+    image_url = ''
+    if file and file.filename:
+        if not allowed_file(file.filename):
+            flash('Tipo de archivo no permitido. Usa png/jpg/jpeg/gif')
+            return redirect(url_for('panel'))
+        filename = secure_filename(file.filename)
+        upload_folder = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+        os.makedirs(upload_folder, exist_ok=True)
+        save_path = os.path.join(upload_folder, filename)
+        file.save(save_path)
+        image_url = url_for('static', filename=f'uploads/{filename}')
+
+    # Guardar en la base de datos
+    try:
+        db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+
+        # Formatear fechas para MySQL: 'YYYY-MM-DD HH:MM:SS'
+        def fmt_mysql(dt_str):
+            if not dt_str:
+                return None
+            s = dt_str.replace('T', ' ')
+            # si falta segundos, añadir :00
+            parts = s.split(' ')
+            if len(parts) > 1 and len(parts[1]) == 5:
+                s = s + ':00'
+            return s
+
+        start_sql = fmt_mysql(fecha_inicio)
+        end_sql = fmt_mysql(fecha_fin)
+
+        # Intentar insertar incluyendo el nombre del archivo en la columna image_url (si existe en la tabla)
+        try:
+            if filename:
+                db.query_db('INSERT INTO notice (name_notice, start_date, end_date, image_url) VALUES (%(name)s, %(start)s, %(end)s, %(img)s)',
+                            {'name': title, 'start': start_sql, 'end': end_sql, 'img': filename})
+            else:
+                db.query_db('INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
+                            {'name': title, 'start': start_sql, 'end': end_sql})
+        except Exception:
+            # Fallback por si la tabla no tiene columna image_url
+            db.query_db('INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
+                        {'name': title, 'start': start_sql, 'end': end_sql})
+
+        # Obtener la última fila insertada
+        row = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 1')
+        inserted = row[0] if row else None
+
+        # Añadir a memoria también para compatibilidad inmediata con endpoints en memoria
+        nuevo_aviso = {
+            'id': inserted['idnotice'] if inserted else (len(avisos) + 1),
+            'title': title,
+            'description': request.form.get('description', ''),
+            'image_url': image_url,
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin,
+            'created_at': datetime.now().isoformat(),
+        }
+        avisos.append(nuevo_aviso)
+        flash('Noticia añadida correctamente')
+    except Exception as e:
+        flash(f'Error al guardar en la base de datos: {e}')
+
+    return redirect(url_for('panel'))
+
+
 if __name__ == '__main__':
+    # Asegurarse de que la carpeta de subidas existe
+    full_upload_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+    os.makedirs(full_upload_path, exist_ok=True)
     app.run(debug=True)
+
+
+
+
+

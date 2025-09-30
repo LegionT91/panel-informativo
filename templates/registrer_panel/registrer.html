@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Registro - Panel Informativo</title>
+  <style>
+    :root{
+      --blue:#2f3873;
+      --blue-dark:#222a5a;
+      --light-gray:#e9e9e9;
+      --card-gray:#dbdbdb;
+      --accent:#2f3873;
+      --text:#222;
+      --muted:#999;
+    }
+
+    /* Ampliación por defecto para pantallas grandes (igual que login.html) */
+    html{
+      zoom: 1.6;
+    }
+
+    /* Asegurar comportamiento por defecto de bloqueo de scroll en escritorio */
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* --- Ajustes para móviles: desactivar zoom global, permitir scroll y aumentar tamaños --- */
+    @media (max-width: 480px) {
+      html { zoom: 1; }
+      html, body { overflow: auto; height: auto; }
+      body { position: relative; inset: auto; padding: 20px; }
+      .frame { width: 94%; max-width: 94%; margin: 12px auto; }
+      .header { padding: 14px 16px; }
+      .brand h1 { font-size: 20px; }
+      .card { padding: 20px; border-radius: 10px; box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
+      .card h2 { font-size: 20px; }
+      input[type="text"], input[type="password"], input[type="email"]{ padding:12px 10px; font-size:16px }
+      .btn{ padding:12px; font-size:18px }
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background: #f3f3f3;
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      /* ocupar toda la pantalla y fijar para evitar scroll por teclado/touch/scrollbar */
+      height:100%;
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+
+
+    .frame{
+      width:380px;
+      max-width:95%;
+      background:white;
+      border:1px solid #e0e0e0;
+      box-shadow:0 2px 0 rgba(0,0,0,0.02);
+    }
+
+
+    .header{
+      background:var(--blue);
+      color:white;
+      padding:18px 22px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .logo{
+      width:56px;
+      height:56px;
+      border-radius:6px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      padding:6px;
+    }
+    .logo img{max-width:100%;height:auto;display:block}
+    .brand{flex:1;text-align:center}
+    .brand h1{margin:0;font-size:18px;letter-spacing:0.5px;font-weight:700;text-transform:uppercase}
+
+    .card-wrap{padding:28px 20px}
+    .card{
+      background:var(--card-gray);
+      border-radius:12px;
+      padding:26px 22px 32px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.12);
+    }
+    .card h2{margin:0 0 18px 0;text-align:center;font-size:22px;color:var(--text);font-weight:700}
+
+    .field{margin-bottom:16px}
+    input[type="text"], input[type="password"], input[type="email"]{
+      width:100%;padding:14px 12px;border:0;border-radius:4px;font-size:15px;outline:none;box-shadow: inset 0 1px 0 rgba(0,0,0,0.03);background:white;
+    }
+
+    .btn{display:block;width:100%;background:var(--accent);color:white;border:0;padding:12px 14px;font-size:16px;font-weight:700;border-radius:4px;cursor:pointer;text-align:center}
+    .btn:active{transform:translateY(1px)}
+
+    .muted{color:var(--muted);font-size:13px;margin-bottom:8px;text-align:center}
+
+    @media (max-width:420px){
+      .frame{width:340px}
+      .logo{width:48px;height:48px}
+    }
+  </style>
+</head>
+<body>
+</body>
+</html>
+
+  <div class="frame" role="main" aria-labelledby="titulo">
+    <div class="header">
+      <div class="logo">
+        <img src="static/logo.png" alt="logo" onerror="this.style.display='none'" />
+      </div>
+      <div class="brand">
+        <h1>PANEL DE<br/>REGISTRO</h1>
+        <small></small>
+      </div>
+    </div>
+
+    <div class="card-wrap">
+      <div class="card">
+        <h2 id="titulo">Crear cuenta</h2>
+
+        <form method="POST" action="/register" novalidate>
+          {% with messages = get_flashed_messages() %}
+            {% if messages %}
+              <div style="color:#2f3873;margin-bottom:12px;text-align:center;">{{ messages[0] }}</div>
+            {% endif %}
+          {% endwith %}
+
+          <div class="field">
+            <input type="text" name="username" placeholder="Usuario" autocomplete="username" required autofocus />
+          </div>
+
+          <div class="field">
+            <input type="email" name="email" placeholder="Email (opcional)" autocomplete="email" />
+          </div>
+
+          <div class="field">
+            <input type="password" name="password" placeholder="Contraseña" autocomplete="new-password" required />
+          </div>
+
+          <div class="field">
+            <input type="password" name="master_key" placeholder="Clave maestra" autocomplete="off" required />
+          </div>
+
+          <div style="margin-top:12px">
+            <button class="btn" type="submit">Registrar</button>
+          </div>
+        </form>
+
+        <p class="muted">¿Ya tienes cuenta? <a href="/login">Ingresa aquí</a></p>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
