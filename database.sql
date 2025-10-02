@@ -26,7 +26,7 @@ DROP TABLE IF EXISTS `notice`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notice` (
   `idnotice` int NOT NULL AUTO_INCREMENT,
-  `name_notice` varchar(45) DEFAULT NULL,
+  `name_notice` varchar(300) DEFAULT NULL,
   `start_date` datetime DEFAULT NULL,
   `end_date` datetime DEFAULT NULL,
   `image_url` varchar(300) DEFAULT NULL,
@@ -79,4 +79,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-09-30 10:56:06
+-- Dump completed on 2025-10-02 13:30:00
