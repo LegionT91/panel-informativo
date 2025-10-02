@@ -38,3 +38,7 @@ if hoy in data["daily"]["time"]:
 	
 else:
     print("No hay datos disponibles para hoy.")
+
+
+
+#nsasa
