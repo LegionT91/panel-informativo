@@ -24,32 +24,26 @@
         </div>
     </div>
     <div class="main-content">
-        <div class="main-card" style="background-image:url('https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg');">
-            <div class="main-card-text">
-                Se acerca el 18, con ello<br>
-                actividades recreativas<br>
-                ¡Pasalo chancho!
+        <div class="main-card" style="background-image:url('{{ main_card.imagen_url }}');">
+            <div class="main-card-overlay">
+                <div class="main-card-text" data-aviso-id="{{ main_card.id or '' }}">
+                    {{ main_card.titulo|safe }}
+                </div>
             </div>
         </div>
         <div class="side-cards">
-            <div class="side-card" style="background-image:url('https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Football_in_Bloomington%2C_Indiana%2C_1995.jpg/1200px-Football_in_Bloomington%2C_Indiana%2C_1995.jpg');">
+            {% for evento in eventos %}
+            <div class="side-card" style="background-image:url('{{ evento.imagen_url }}');">
                 <div class="side-card-overlay">
-                    <div class="side-card-date">02 de septiembre</div>
+                    <div class="side-card-date">
+                        {{ evento.fecha_inicio }} - {{ evento.fecha_fin }}
+                    </div>
                     <div class="side-card-title">
-                        Actividades Recreativas:<br>
-                        Campeonato de Futbol
+                        {{ evento.titulo }}
                     </div>
                 </div>
             </div>
-            <div class="side-card" style="background-image:url('https://assets.megamediaradios.fm/sites/2/2023/06/sopaipillas-12-1300x975-1.jpeg');">
-                <div class="side-card-overlay">
-                    <div class="side-card-date">09 de septiembre</div>
-                    <div class="side-card-title">
-                        Venta de sopaipillas 3°<br>
-                        Administracion
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
     </div>
     <script src="static/main_panel/script.js"></script>

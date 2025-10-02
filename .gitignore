@@ -1,0 +1,35 @@
+# Compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de entorno
+.env
+.venv/
+venv/
+ENV/
+
+# Configuración de IDEs y editores
+.vscode/
+.idea/
+*.swp
+
+# Archivos de logs
+*.log
+
+# Archivos de base de datos local
+*.sqlite3
+
+# Carpetas de pruebas y cobertura
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# Distribución y empaquetado
+build/
+dist/
+*.egg-info/
+.eggs/
+
+uploads/
