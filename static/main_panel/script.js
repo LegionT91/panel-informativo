@@ -46,6 +46,48 @@ function actualizarHoraFecha() {
     }
 }
 
+// Función para actualizar el clima dinámicamente
+async function actualizarClima() {
+    try {
+        const response = await fetch('/api/clima');
+        const clima = await response.json();
+        
+        if (clima) {
+            const iconoElement = document.getElementById('icono-clima');
+            const temperaturaElement = document.getElementById('temperatura-actual');
+            const descripcionElement = document.getElementById('descripcion-clima');
+            
+            // Animación suave para cambio de clima
+            const weatherInfo = document.querySelector('.weather-info');
+            weatherInfo.style.opacity = '0.7';
+            weatherInfo.style.transform = 'scale(0.95)';
+            
+            setTimeout(() => {
+                // Actualizar icono
+                if (iconoElement) {
+                    iconoElement.className = `bi ${clima.icono_bootstrap} weather-icon`;
+                }
+                
+                // Actualizar temperatura
+                if (temperaturaElement) {
+                    temperaturaElement.textContent = `${Math.round(clima.temperatura_actual)}°C`;
+                }
+                
+                // Actualizar descripción
+                if (descripcionElement) {
+                    descripcionElement.textContent = clima.descripcion;
+                }
+                
+                // Restaurar animación
+                weatherInfo.style.opacity = '1';
+                weatherInfo.style.transform = 'scale(1)';
+            }, 300);
+        }
+    } catch (error) {
+        console.error('Error actualizando clima:', error);
+    }
+}
+
 // Función para cargar avisos desde la API
 async function cargarAvisos() {
     try {
@@ -279,8 +321,12 @@ function obtenerIdAvisoPrincipalInicial() {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
-actualizarHoraFecha();
-setInterval(actualizarHoraFecha, 1000);
+    actualizarHoraFecha();
+    setInterval(actualizarHoraFecha, 1000);
+    
+    // Actualizar clima inmediatamente y luego cada 10 minutos
+    actualizarClima();
+    setInterval(actualizarClima, 600000); // 10 minutos = 600,000 ms
     
     // Obtener el ID del aviso principal inicial
     obtenerIdAvisoPrincipalInicial();

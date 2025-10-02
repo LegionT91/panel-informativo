@@ -10,6 +10,9 @@ from mysqlconnection import connectToMySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
+# Importar función del clima
+from clima import obtener_clima_nueva_imperial
+
 # ============================================================================
 # CONFIGURACIÓN DE LA APLICACIÓN
 # ============================================================================
@@ -269,9 +272,35 @@ def home():
             'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
         }
         eventos = []
+    
+    # Obtener datos del clima
+    try:
+        clima = obtener_clima_nueva_imperial()
+    except Exception as e:
+        print(f"Error obteniendo clima: {e}")
+        # Valores por defecto en caso de error
+        clima = {
+            "temperatura_actual": 15,
+            "icono_bootstrap": "bi-sun",
+            "descripcion": "Soleado"
+        }
         
-    return render_template('main_panel/home.html', eventos=eventos, main_card=main_card)
+    return render_template('main_panel/home.html', eventos=eventos, main_card=main_card, clima=clima)
 
+
+@app.route('/api/clima', methods=['GET'])
+def get_clima():
+    """API pública para obtener datos del clima"""
+    try:
+        clima = obtener_clima_nueva_imperial()
+        return jsonify(clima)
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "temperatura_actual": 15,
+            "icono_bootstrap": "bi-sun",
+            "descripcion": "Soleado"
+        }), 500
 
 @app.route('/panel/avisos', methods=['GET'])
 def get_avisos():

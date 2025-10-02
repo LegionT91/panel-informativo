@@ -5,6 +5,7 @@
     <title>Panel Informativo - Príncipe de Gales</title>
     <link href="https://fonts.googleapis.com/css?family=Montserrat:700,400&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="static/main_panel/style.css">
 </head>
 <body>
@@ -17,9 +18,13 @@
         </div>
         <div class="time" id="hora-actual"></div>
         <div class="weather-area">
-            <span class="material-icons weather-icon">cloud</span>
-            <span class="material-icons weather-icon" style="font-size:32px;margin-left:-18px;">grain</span>
-            <span class="material-icons weather-icon" style="font-size:32px;margin-left:-18px;">grain</span>
+            <div class="weather-info">
+                <i class="bi {{ clima.icono_bootstrap }} weather-icon" id="icono-clima"></i>
+                <div class="weather-details">
+                    <span class="temperature" id="temperatura-actual">{{ clima.temperatura_actual }}°C</span>
+                    <span class="weather-description" id="descripcion-clima">{{ clima.descripcion }}</span>
+                </div>
+            </div>
             <span class="date" id="fecha-actual"></span>
         </div>
     </div>
