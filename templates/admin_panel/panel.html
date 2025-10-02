@@ -203,15 +203,43 @@ async function deleteAviso(id) {
 // Volcar avisos desde la API y renderizar el HTML en el cliente
 async function fetchAndRenderAvisos() {
 	try {
-		const res = await fetch('/panel/avisos');
-		if (!res.ok) return;
+		// Si ya hay una actualización en curso, esperar
+		if (isUpdating) {
+			console.log('Actualización en curso, esperando...');
+			return;
+		}
+		
+		isUpdating = true;
+		const res = await fetch('/panel/avisos?all=1');
+		if (!res.ok) {
+			console.error('Error al obtener avisos:', res.status, res.statusText);
+			const container = document.querySelector('.news-container');
+			if (container) {
+				container.innerHTML = '<div class="alert alert-danger">Error al cargar las noticias. Por favor, recarga la página.</div>';
+			}
+			return;
+		}
+
 		let avisos = await res.json();
+		console.log('Avisos recibidos del servidor:', avisos); // Log para depuración
+
 		const container = document.querySelector('.news-container');
-		if (!container) return;
-		if (!Array.isArray(avisos) || avisos.length === 0) {
+		if (!container) {
+			console.error('Contenedor de noticias no encontrado');
+			return;
+		}
+
+		if (!Array.isArray(avisos)) {
+			console.error('Los avisos recibidos no son un array:', avisos);
+			container.innerHTML = '<div class="alert alert-danger">Error en el formato de datos recibidos.</div>';
+			return;
+		}
+
+		if (avisos.length === 0) {
 			container.innerHTML = '<div class="alert alert-info">No hay noticias registradas en la base de datos.</div>';
 			return;
 		}
+
 		// Ordenar por fecha_inicio descendente - parsing robusto para distintos formatos
 		const parseISOtoMs = (s) => {
 			if (!s) return 0;
@@ -219,36 +247,51 @@ async function fetchAndRenderAvisos() {
 			if (typeof s === 'number') return s;
 			// Algunos formatos pueden venir como 'YYYY-MM-DD HH:MM:SS' o 'YYYY-MM-DDTHH:MM' (sin segundos)
 			let str = String(s).trim();
-			// Reemplazar espacio entre fecha y hora por 'T'
-			if (str.indexOf(' ') > 0 && str.indexOf('T') === -1) {
-				str = str.replace(' ', 'T');
-			}
-			// Si tiene formato 'YYYY-MM-DDTHH:MM' añadir segundos
-			const timePart = str.split('T')[1];
-			if (timePart && timePart.length === 5) {
-				str = str + ':00';
-			}
-			const ms = Date.parse(str);
-			if (!isNaN(ms)) return ms;
-			// Fallback: try replacing space with 'T' and parse again
 			try {
+				// Reemplazar espacio entre fecha y hora por 'T'
+				if (str.indexOf(' ') > 0 && str.indexOf('T') === -1) {
+					str = str.replace(' ', 'T');
+				}
+				// Si tiene formato 'YYYY-MM-DDTHH:MM' añadir segundos
+				const timePart = str.split('T')[1];
+				if (timePart && timePart.length === 5) {
+					str = str + ':00';
+				}
+				const ms = Date.parse(str);
+				if (!isNaN(ms)) return ms;
+				// Fallback: try direct Date parsing
 				return new Date(str).getTime() || 0;
 			} catch (e) {
+				console.warn('Error parseando fecha:', s, e);
 				return 0;
 			}
 		};
 
 		// Orden relativo: primero los avisos que ya comenzaron (más recientes primero),
-		// luego los futuros (los más cercanos primero).
+		// luego los futuros (los más cercanos primero), y al final los que no tienen fecha.
 		const now = Date.now();
-		const parsed = avisos.map(a => ({ ...a, _ms: parseISOtoMs(a.fecha_inicio) }));
-		// Tratar fechas inválidas como +Inf para que queden al final
-		parsed.forEach(p => {
-			if (!p._ms || isNaN(p._ms)) p._ms = Infinity;
+		const parsed = avisos.map(a => {
+			const ms = parseISOtoMs(a.fecha_inicio);
+			console.log(`Aviso ID ${a.id}: fecha_inicio = ${a.fecha_inicio}, ms = ${ms}`); // Log para depuración
+			return { ...a, _ms: ms };
 		});
-		const started = parsed.filter(p => p._ms <= now).sort((a, b) => b._ms - a._ms);
-		const future = parsed.filter(p => p._ms > now).sort((a, b) => a._ms - b._ms);
-		avisos = started.concat(future);
+
+		// Separar en tres grupos: actuales, futuros y sin fecha
+		const withValidDates = parsed.filter(p => p._ms > 0);
+		const noDates = parsed.filter(p => p._ms === 0);
+		
+		const started = withValidDates.filter(p => p._ms <= now).sort((a, b) => b._ms - a._ms);
+		const future = withValidDates.filter(p => p._ms > now).sort((a, b) => a._ms - b._ms);
+		
+		// Concatenar todos los grupos
+		avisos = [...started, ...future, ...noDates];
+		
+		console.log('Avisos procesados:', {
+			total: avisos.length,
+			started: started.length,
+			future: future.length,
+			noDates: noDates.length
+		});
 		const logoUrl = '{{ url_for("static", filename="logo.png") }}';
 		container.innerHTML = avisos.map(aviso => {
 				const img = aviso.image_url && aviso.image_url !== '' ? aviso.image_url : logoUrl;
@@ -269,13 +312,65 @@ async function fetchAndRenderAvisos() {
 			}).join('\n');
 	} catch (err) {
 		console.error('Error cargando avisos:', err);
+	} finally {
+		isUpdating = false;
 	}
 }
 
-// Llamar al cargar y refrescar periódicamente cada 10s
-document.addEventListener('DOMContentLoaded', function() {
-	fetchAndRenderAvisos();
-	setInterval(fetchAndRenderAvisos, 10000);
+// Variables para controlar el estado y la actualización
+let lastAvisosHash = '';
+let isUpdating = false;
+
+// Función para generar un hash simple de los avisos
+function generateAvisosHash(avisos) {
+    return avisos.map(a => `${a.id}-${a.title}-${a.fecha_inicio}-${a.fecha_fin}`).join('|');
+}
+
+// Función para verificar si hay cambios reales en los avisos
+async function checkAndUpdateAvisos() {
+    if (isUpdating) return; // Evitar actualizaciones simultáneas
+    
+    try {
+        isUpdating = true;
+		const res = await fetch('/panel/avisos?all=1');
+        if (!res.ok) {
+            console.error('Error al verificar avisos:', res.status);
+            return;
+        }
+
+        const nuevosAvisos = await res.json();
+        const nuevoHash = generateAvisosHash(nuevosAvisos);
+
+        // Solo actualizar si hay cambios reales
+        if (nuevoHash !== lastAvisosHash) {
+            console.log('Cambios detectados, actualizando avisos...');
+            await fetchAndRenderAvisos();
+            lastAvisosHash = nuevoHash;
+        }
+    } catch (err) {
+        console.error('Error en checkAndUpdateAvisos:', err);
+    } finally {
+        isUpdating = false;
+    }
+}
+
+// Inicialización cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', async function() {
+    // Primera carga
+    await fetchAndRenderAvisos();
+    // Actualizar el hash inicial
+	try {
+		const res = await fetch('/panel/avisos?all=1');
+		if (res.ok) {
+			const avisos = await res.json();
+			lastAvisosHash = generateAvisosHash(avisos);
+		}
+	} catch (err) {
+		console.error('Error al inicializar hash:', err);
+	}
+    
+    // Configurar intervalo de verificación
+    setInterval(checkAndUpdateAvisos, 10000);
 });
 // Mostrar vista previa cuando se seleccione un fichero en el modal de edición
 const editFileInputGlobal = document.getElementById('editImageFile');
@@ -324,7 +419,7 @@ document.addEventListener('click', function(e) {
 async function openEditModal(id) {
 	// Obtener datos del aviso desde la API
 	try {
-		const res = await fetch('/panel/avisos');
+		const res = await fetch('/panel/avisos?all=1');
 		if (!res.ok) throw new Error('No se pudo cargar avisos');
 		const list = await res.json();
 		const aviso = list.find(a => String(a.id) === String(id));

@@ -309,10 +309,11 @@ def get_avisos():
         db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
         rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
         
-        # Separar avisos con fecha y sin fecha
+        # Mapear todos los avisos (estructura que usa el cliente)
+        mapped_all = []
         avisos_con_fecha = []
         avisos_sin_fecha = []
-        
+
         for r in rows:
             aviso_data = {
                 'id': r.get('idnotice'),
@@ -322,11 +323,18 @@ def get_avisos():
                 'fecha_inicio': fmt_field(r.get('start_date')),
                 'fecha_fin': fmt_field(r.get('end_date')),
             }
-            
+            mapped_all.append(aviso_data)
+
+            # Mantener la separación por fecha para la lógica actual
             if r.get('start_date'):
                 avisos_con_fecha.append((aviso_data, r.get('start_date')))
             else:
                 avisos_sin_fecha.append(aviso_data)
+
+        # Si el cliente solicita todos los avisos explícitamente, devolverlos sin filtrar
+        all_param = str(request.args.get('all', '')).lower()
+        if all_param in ('1', 'true', 'yes'):
+            return jsonify(mapped_all)
         
         # Filtrar y ordenar avisos con fecha por proximidad (dentro de 2 semanas)
         from datetime import datetime, timedelta
