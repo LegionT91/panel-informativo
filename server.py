@@ -139,10 +139,28 @@ def handle_needs_login():
 @app.route('/')
 @app.route('/home')
 def home():
-    """Página principal que muestra las últimas 3 noticias"""
+    """Página principal que muestra las últimas 3 noticias y un aviso destacado"""
     try:
         db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
-        rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 3')
+        
+        # Obtener el aviso más reciente para el recuadro principal
+        main_card_row = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 1')
+        main_card = None
+        if main_card_row:
+            r = main_card_row[0]
+            main_card = {
+                'titulo': r.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
+                'imagen_url': r.get('image_url', 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg'),
+            }
+        else:
+            # Fallback si no hay avisos en la base de datos
+            main_card = {
+                'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
+                'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
+            }
+        
+        # Obtener las siguientes 3 noticias para las tarjetas laterales (excluyendo la primera)
+        rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 3 OFFSET 1')
         eventos = []
         for r in rows:
             eventos.append({
@@ -151,9 +169,27 @@ def home():
                 'fecha_fin': fmt_field_display(r.get('end_date')),
                 'imagen_url': r.get('image_url', ''),
             })
+            
+        # Si no hay suficientes avisos para las tarjetas laterales, obtener las últimas 3
+        if len(eventos) == 0:
+            rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 3')
+            for r in rows:
+                eventos.append({
+                    'titulo': r.get('name_notice', ''),
+                    'fecha_inicio': fmt_field_display(r.get('start_date')),
+                    'fecha_fin': fmt_field_display(r.get('end_date')),
+                    'imagen_url': r.get('image_url', ''),
+                })
+                
     except Exception:
+        # Fallback en caso de error con la base de datos
+        main_card = {
+            'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
+            'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
+        }
         eventos = []
-    return render_template('main_panel/home.html', eventos=eventos)
+        
+    return render_template('main_panel/home.html', eventos=eventos, main_card=main_card)
 
 
 @app.route('/panel/avisos', methods=['GET'])
