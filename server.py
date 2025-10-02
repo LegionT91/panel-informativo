@@ -139,50 +139,131 @@ def handle_needs_login():
 @app.route('/')
 @app.route('/home')
 def home():
-    """Página principal que muestra las últimas 3 noticias y un aviso destacado"""
+    """Página principal que muestra noticias priorizadas por proximidad de fecha"""
     try:
         db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
         
-        # Obtener el aviso más reciente para el recuadro principal
-        main_card_row = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 1')
-        main_card = None
-        if main_card_row:
-            r = main_card_row[0]
-            main_card = {
-                'titulo': r.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
-                'imagen_url': r.get('image_url', 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg'),
-            }
+        # Obtener todos los avisos para procesarlos por proximidad de fecha
+        all_rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
+        
+        if all_rows:
+            # Separar avisos con fecha y sin fecha
+            avisos_con_fecha = []
+            avisos_sin_fecha = []
+            
+            for r in all_rows:
+                if r.get('start_date'):
+                    avisos_con_fecha.append(r)
+                else:
+                    avisos_sin_fecha.append(r)
+            
+            # Filtrar y ordenar avisos con fecha por proximidad (dentro de 2 semanas)
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            
+            # Definir el rango de 2 semanas (1 semana atrás, 1 semana adelante)
+            una_semana_atras = now - timedelta(weeks=1)
+            una_semana_adelante = now + timedelta(weeks=1)
+            
+            def esta_en_rango_dos_semanas(aviso):
+                try:
+                    fecha_inicio = aviso.get('start_date')
+                    if fecha_inicio:
+                        if isinstance(fecha_inicio, str):
+                            fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
+                        # Verificar si está dentro del rango de 2 semanas
+                        return una_semana_atras <= fecha_inicio <= una_semana_adelante
+                    return False  # Sin fecha, no está en rango
+                except:
+                    return False
+            
+            def calcular_proximidad(aviso):
+                try:
+                    fecha_inicio = aviso.get('start_date')
+                    if fecha_inicio:
+                        if isinstance(fecha_inicio, str):
+                            fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
+                        # Calcular diferencia absoluta en días
+                        diff = abs((fecha_inicio - now).days)
+                        # Priorizar eventos futuros cercanos
+                        if fecha_inicio >= now:
+                            return diff
+                        else:
+                            # Eventos pasados tienen menor prioridad
+                            return diff + 1000
+                    return 9999  # Sin fecha, menor prioridad
+                except:
+                    return 9999
+            
+            # Filtrar avisos que estén dentro del rango de 2 semanas
+            avisos_en_rango = [aviso for aviso in avisos_con_fecha if esta_en_rango_dos_semanas(aviso)]
+            avisos_en_rango.sort(key=calcular_proximidad)
+            
+            # Solo incluir avisos sin fecha si no hay suficientes avisos en rango
+            avisos_con_fecha = avisos_en_rango
+            
+            # Combinar: avisos en rango primero, luego sin fecha solo si es necesario
+            if len(avisos_con_fecha) >= 4:  # Si tenemos suficientes avisos en rango
+                avisos_ordenados = avisos_con_fecha
+            else:
+                # Si no hay suficientes avisos en rango, agregar algunos sin fecha
+                avisos_ordenados = avisos_con_fecha + avisos_sin_fecha[:4-len(avisos_con_fecha)]
+            
+            # Obtener el aviso más próximo para el recuadro principal
+            if avisos_ordenados:
+                r = avisos_ordenados[0]
+                main_card = {
+                    'titulo': r.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
+                    'imagen_url': r.get('image_url', 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg'),
+                    'id': r.get('idnotice'),  # Agregar ID para evitar duplicados
+                }
+                
+                # Obtener las siguientes noticias para las tarjetas laterales (evitando duplicados)
+                eventos = []
+                main_card_id = r.get('idnotice')
+                
+                # Buscar avisos únicos para las tarjetas laterales
+                for r in avisos_ordenados[1:]:  # Empezar desde el segundo aviso
+                    if len(eventos) >= 3:  # Solo necesitamos 3 tarjetas laterales
+                        break
+                        
+                    # Verificar que no sea el mismo que el principal
+                    if r.get('idnotice') != main_card_id:
+                        eventos.append({
+                            'titulo': r.get('name_notice', ''),
+                            'fecha_inicio': fmt_field_display(r.get('start_date')),
+                            'fecha_fin': fmt_field_display(r.get('end_date')),
+                            'imagen_url': r.get('image_url', ''),
+                            'id': r.get('idnotice'),  # Agregar ID para JavaScript
+                        })
+                
+                # Si no hay suficientes avisos únicos, crear avisos placeholder
+                while len(eventos) < 3:
+                    eventos.append({
+                        'titulo': 'Próximamente más noticias',
+                        'fecha_inicio': '',
+                        'fecha_fin': '',
+                        'imagen_url': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=400&q=80',
+                        'id': f'placeholder_{len(eventos)}',
+                    })
+            else:
+                # Fallback si no hay avisos
+                main_card = {
+                    'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
+                    'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
+                }
+                eventos = []
         else:
             # Fallback si no hay avisos en la base de datos
             main_card = {
                 'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
                 'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
             }
-        
-        # Obtener las siguientes 3 noticias para las tarjetas laterales (excluyendo la primera)
-        rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 3 OFFSET 1')
-        eventos = []
-        for r in rows:
-            eventos.append({
-                'titulo': r.get('name_notice', ''),
-                'fecha_inicio': fmt_field_display(r.get('start_date')),
-                'fecha_fin': fmt_field_display(r.get('end_date')),
-                'imagen_url': r.get('image_url', ''),
-            })
-            
-        # Si no hay suficientes avisos para las tarjetas laterales, obtener las últimas 3
-        if len(eventos) == 0:
-            rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 3')
-            for r in rows:
-                eventos.append({
-                    'titulo': r.get('name_notice', ''),
-                    'fecha_inicio': fmt_field_display(r.get('start_date')),
-                    'fecha_fin': fmt_field_display(r.get('end_date')),
-                    'imagen_url': r.get('image_url', ''),
-                })
+            eventos = []
                 
-    except Exception:
+    except Exception as e:
         # Fallback en caso de error con la base de datos
+        print(f"Error en home(): {e}")  # Para debug
         main_card = {
             'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
             'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
@@ -194,20 +275,75 @@ def home():
 
 @app.route('/panel/avisos', methods=['GET'])
 def get_avisos():
-    """API pública para obtener todos los avisos"""
+    """API pública para obtener todos los avisos ordenados por proximidad de fecha"""
     try:
         db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
         rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
-        mapped = []
+        
+        # Separar avisos con fecha y sin fecha
+        avisos_con_fecha = []
+        avisos_sin_fecha = []
+        
         for r in rows:
-            mapped.append({
+            aviso_data = {
                 'id': r.get('idnotice'),
                 'title': r.get('name_notice'),
                 'description': r.get('description') if 'description' in r else '',
                 'image_url': r.get('image_url') if 'image_url' in r else '',
                 'fecha_inicio': fmt_field(r.get('start_date')),
                 'fecha_fin': fmt_field(r.get('end_date')),
-            })
+            }
+            
+            if r.get('start_date'):
+                avisos_con_fecha.append((aviso_data, r.get('start_date')))
+            else:
+                avisos_sin_fecha.append(aviso_data)
+        
+        # Filtrar y ordenar avisos con fecha por proximidad (dentro de 2 semanas)
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        
+        # Definir el rango de 2 semanas (1 semana atrás, 1 semana adelante)
+        una_semana_atras = now - timedelta(weeks=1)
+        una_semana_adelante = now + timedelta(weeks=1)
+        
+        def esta_en_rango_dos_semanas_api(item):
+            aviso_data, fecha_inicio = item
+            try:
+                if isinstance(fecha_inicio, str):
+                    fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
+                # Verificar si está dentro del rango de 2 semanas
+                return una_semana_atras <= fecha_inicio <= una_semana_adelante
+            except:
+                return False
+        
+        def calcular_proximidad_api(item):
+            aviso_data, fecha_inicio = item
+            try:
+                if isinstance(fecha_inicio, str):
+                    fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
+                # Calcular diferencia en días
+                diff = abs((fecha_inicio - now).days)
+                # Priorizar eventos futuros cercanos
+                if fecha_inicio >= now:
+                    return diff
+                else:
+                    # Eventos pasados tienen menor prioridad
+                    return diff + 1000
+            except:
+                return 9999
+        
+        # Filtrar avisos que estén dentro del rango de 2 semanas
+        avisos_en_rango = [item for item in avisos_con_fecha if esta_en_rango_dos_semanas_api(item)]
+        avisos_en_rango.sort(key=calcular_proximidad_api)
+        
+        # Combinar resultados: avisos en rango primero, luego sin fecha solo si es necesario
+        if len(avisos_en_rango) >= 10:  # Para API, permitir más avisos
+            mapped = [item[0] for item in avisos_en_rango]
+        else:
+            # Si no hay suficientes avisos en rango, agregar algunos sin fecha
+            mapped = [item[0] for item in avisos_en_rango] + avisos_sin_fecha[:10-len(avisos_en_rango)]
+        
         return jsonify(mapped)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

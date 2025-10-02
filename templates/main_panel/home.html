@@ -26,7 +26,7 @@
     <div class="main-content">
         <div class="main-card" style="background-image:url('{{ main_card.imagen_url }}');">
             <div class="main-card-overlay">
-                <div class="main-card-text">
+                <div class="main-card-text" data-aviso-id="{{ main_card.id or '' }}">
                     {{ main_card.titulo|safe }}
                 </div>
             </div>

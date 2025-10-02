@@ -5,6 +5,97 @@ body {
     overflow: hidden;
     height: 100vh;
 }
+
+/* Animaciones globales */
+* {
+    transition: all 0.3s ease-in-out;
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes backgroundZoom {
+    0% {
+        background-size: 100%;
+    }
+    50% {
+        background-size: 110%;
+    }
+    100% {
+        background-size: 100%;
+    }
+}
+
+@keyframes backgroundZoomSlow {
+    0% {
+        background-size: 100%;
+    }
+    50% {
+        background-size: 105%;
+    }
+    100% {
+        background-size: 100%;
+    }
+}
+
+@keyframes backgroundZoomTransition {
+    0% {
+        background-size: 100%;
+        opacity: 0.8;
+    }
+    50% {
+        background-size: 115%;
+        opacity: 0.9;
+    }
+    100% {
+        background-size: 100%;
+        opacity: 1;
+    }
+}
+
+/* Clase para animaciones de transición de imagen */
+.image-transition {
+    animation: backgroundZoomTransition 0.8s ease-in-out !important;
+}
 .header {
     background: #353c7a;
     color: #fff;
@@ -14,6 +105,7 @@ body {
     padding: 12px 50px 12px 25px;
     height: 138px;
     box-sizing: border-box;
+    animation: slideInLeft 0.8s ease-out;
 }
 .logo-area {
     display: flex;
@@ -33,6 +125,8 @@ body {
     font-weight: 700;
     margin: 0 50px;
     letter-spacing: 2px;
+    animation: fadeIn 1s ease-in;
+    transition: all 0.5s ease-in-out;
 }
 .weather-area {
     display: flex;
@@ -62,6 +156,13 @@ body {
     display: flex;
     align-items: flex-end;
     overflow: hidden;
+    animation: zoomIn 1s ease-out, backgroundZoomSlow 8s ease-in-out infinite;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.main-card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
 }
 .main-card-overlay {
     background: rgba(0,0,0,0.45);
@@ -96,6 +197,26 @@ body {
     justify-content: flex-end;
     padding: 0;
     overflow: hidden;
+    animation: slideInRight 0.8s ease-out, backgroundZoom 6s ease-in-out infinite;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.side-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+}
+
+.side-card:nth-child(1) { 
+    animation-delay: 0.2s, 0s; 
+}
+.side-card:nth-child(2) { 
+    animation-delay: 0.4s, 2s; 
+}
+.side-card:nth-child(3) { 
+    animation-delay: 0.6s, 4s; 
+}
+.side-card:nth-child(4) { 
+    animation-delay: 0.8s, 1s; 
 }
 .side-card:nth-child(2) {
     background: url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80') center/cover no-repeat;
