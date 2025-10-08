@@ -103,6 +103,34 @@ def fmt_field_display(dt):
     return str(dt)
 
 
+def humanize_main_date(start_dt):
+    """Devuelve texto humano para la tarjeta principal según proximidad.
+    - Hoy / Mañana
+    - En X días (<= 7 días)
+    - Si > 7 días o pasado, fecha dd/mm/YYYY
+    """
+    if not start_dt:
+        return ""
+    try:
+        if isinstance(start_dt, str):
+            # Normalizar 'YYYY-MM-DDTHH:MM' o 'YYYY-MM-DD HH:MM:SS'
+            start_dt = datetime.fromisoformat(start_dt.replace('T', ' '))
+        today = datetime.now().date()
+        d = start_dt.date()
+        delta_days = (d - today).days
+
+        if delta_days == 0:
+            return "Hoy"
+        if delta_days == 1:
+            return "Mañana"
+        if 1 < delta_days <= 7:
+            return f"En {delta_days} días"
+        # Para pasado o más de una semana, mostrar fecha
+        return d.strftime('%d/%m/%Y')
+    except Exception:
+        return fmt_field_display(start_dt)
+
+
 # ============================================================================
 # MIDDLEWARE Y HANDLERS
 # ============================================================================
@@ -160,26 +188,10 @@ def home():
                 else:
                     avisos_sin_fecha.append(r)
             
-            # Filtrar y ordenar avisos con fecha por proximidad (dentro de 2 semanas)
+            # Ordenar por proximidad sin limitar por rango; priorizar próximos
             from datetime import datetime, timedelta
             now = datetime.now()
-            
-            # Definir el rango de 2 semanas (1 semana atrás, 1 semana adelante)
-            una_semana_atras = now - timedelta(weeks=1)
-            una_semana_adelante = now + timedelta(weeks=1)
-            
-            def esta_en_rango_dos_semanas(aviso):
-                try:
-                    fecha_inicio = aviso.get('start_date')
-                    if fecha_inicio:
-                        if isinstance(fecha_inicio, str):
-                            fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
-                        # Verificar si está dentro del rango de 2 semanas
-                        return una_semana_atras <= fecha_inicio <= una_semana_adelante
-                    return False  # Sin fecha, no está en rango
-                except:
-                    return False
-            
+
             def calcular_proximidad(aviso):
                 try:
                     fecha_inicio = aviso.get('start_date')
@@ -197,28 +209,23 @@ def home():
                     return 9999  # Sin fecha, menor prioridad
                 except:
                     return 9999
-            
-            # Filtrar avisos que estén dentro del rango de 2 semanas
-            avisos_en_rango = [aviso for aviso in avisos_con_fecha if esta_en_rango_dos_semanas(aviso)]
-            avisos_en_rango.sort(key=calcular_proximidad)
-            
-            # Solo incluir avisos sin fecha si no hay suficientes avisos en rango
-            avisos_con_fecha = avisos_en_rango
-            
-            # Combinar: avisos en rango primero, luego sin fecha solo si es necesario
-            if len(avisos_con_fecha) >= 4:  # Si tenemos suficientes avisos en rango
-                avisos_ordenados = avisos_con_fecha
-            else:
-                # Si no hay suficientes avisos en rango, agregar algunos sin fecha
-                avisos_ordenados = avisos_con_fecha + avisos_sin_fecha[:4-len(avisos_con_fecha)]
+            # Ordenar todos los que tienen fecha por proximidad y tomar los 4 más próximos
+            avisos_con_fecha.sort(key=calcular_proximidad)
+            avisos_ordenados = avisos_con_fecha[:4]
+            # Completar con sin fecha si faltan
+            if len(avisos_ordenados) < 4:
+                faltan = 4 - len(avisos_ordenados)
+                avisos_ordenados = avisos_ordenados + avisos_sin_fecha[:faltan]
             
             # Obtener el aviso más próximo para el recuadro principal
             if avisos_ordenados:
                 r = avisos_ordenados[0]
+                imagen_main = r.get('image_url') if r.get('image_url') else 'static/main_panel/img/logo.png'
                 main_card = {
                     'titulo': r.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
-                    'imagen_url': r.get('image_url', 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg'),
+                    'imagen_url': imagen_main,
                     'id': r.get('idnotice'),  # Agregar ID para evitar duplicados
+                    'etiqueta_fecha': humanize_main_date(r.get('start_date')),
                 }
                 
                 # Obtener las siguientes noticias para las tarjetas laterales (evitando duplicados)
@@ -236,26 +243,25 @@ def home():
                             'titulo': r.get('name_notice', ''),
                             'fecha_inicio': fmt_field_display(r.get('start_date')),
                             'fecha_fin': fmt_field_display(r.get('end_date')),
-                            'imagen_url': r.get('image_url', ''),
+                            'imagen_url': (r.get('image_url') if r.get('image_url') else 'static/main_panel/img/logo.png'),
                             'id': r.get('idnotice'),  # Agregar ID para JavaScript
                         })
                 
-                # Si no hay suficientes avisos únicos, crear avisos placeholder
-                while len(eventos) < 3:
-                    eventos.append({
-                        'titulo': 'Próximamente más noticias',
-                        'fecha_inicio': '',
-                        'fecha_fin': '',
-                        'imagen_url': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=400&q=80',
-                        'id': f'placeholder_{len(eventos)}',
-                    })
+                # No agregar placeholders cuando sí hay avisos
             else:
                 # Fallback si no hay avisos
                 main_card = {
                     'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
                     'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
                 }
-                eventos = []
+                # Mostrar un solo placeholder cuando no hay ningún aviso
+                eventos = [{
+                    'titulo': 'Próximamente más noticias',
+                    'fecha_inicio': '',
+                    'fecha_fin': '',
+                    'imagen_url': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=400&q=80',
+                    'id': 'placeholder_0',
+                }]
         else:
             # Fallback si no hay avisos en la base de datos
             main_card = {
@@ -331,57 +337,45 @@ def get_avisos():
             else:
                 avisos_sin_fecha.append(aviso_data)
 
-        # Si el cliente solicita todos los avisos explícitamente, devolverlos sin filtrar
-        all_param = str(request.args.get('all', '')).lower()
-        if all_param in ('1', 'true', 'yes'):
-            return jsonify(mapped_all)
-        
-        # Filtrar y ordenar avisos con fecha por proximidad (dentro de 2 semanas)
-        from datetime import datetime, timedelta
+        # Ordenar por proximidad SIN límite de rango, priorizando próximos
+        from datetime import datetime
         now = datetime.now()
-        
-        # Definir el rango de 2 semanas (1 semana atrás, 1 semana adelante)
-        una_semana_atras = now - timedelta(weeks=1)
-        una_semana_adelante = now + timedelta(weeks=1)
-        
-        def esta_en_rango_dos_semanas_api(item):
-            aviso_data, fecha_inicio = item
-            try:
-                if isinstance(fecha_inicio, str):
-                    fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
-                # Verificar si está dentro del rango de 2 semanas
-                return una_semana_atras <= fecha_inicio <= una_semana_adelante
-            except:
-                return False
-        
+
         def calcular_proximidad_api(item):
             aviso_data, fecha_inicio = item
             try:
                 if isinstance(fecha_inicio, str):
                     fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
-                # Calcular diferencia en días
                 diff = abs((fecha_inicio - now).days)
-                # Priorizar eventos futuros cercanos
-                if fecha_inicio >= now:
-                    return diff
-                else:
-                    # Eventos pasados tienen menor prioridad
-                    return diff + 1000
+                return diff if fecha_inicio >= now else diff + 1000
             except:
                 return 9999
-        
-        # Filtrar avisos que estén dentro del rango de 2 semanas
-        avisos_en_rango = [item for item in avisos_con_fecha if esta_en_rango_dos_semanas_api(item)]
-        avisos_en_rango.sort(key=calcular_proximidad_api)
-        
-        # Combinar resultados: avisos en rango primero, luego sin fecha solo si es necesario
-        if len(avisos_en_rango) >= 10:  # Para API, permitir más avisos
-            mapped = [item[0] for item in avisos_en_rango]
-        else:
-            # Si no hay suficientes avisos en rango, agregar algunos sin fecha
-            mapped = [item[0] for item in avisos_en_rango] + avisos_sin_fecha[:10-len(avisos_en_rango)]
-        
+
+        avisos_con_fecha.sort(key=calcular_proximidad_api)
+        mapped = [item[0] for item in avisos_con_fecha] + avisos_sin_fecha
+
         return jsonify(mapped)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/panel/avisos_hash', methods=['GET'])
+def get_avisos_hash():
+    """Devuelve un hash representando el estado actual de los avisos.
+    El frontend puede usarlo para detectar cambios y recargar.
+    """
+    try:
+        import hashlib
+        db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
+        rows = db.query_db('SELECT idnotice, name_notice, start_date, end_date, image_url FROM notice ORDER BY idnotice')
+        parts = []
+        for r in rows:
+            parts.append(
+                f"{r.get('idnotice')}|{r.get('name_notice') or ''}|{fmt_field(r.get('start_date')) or ''}|{fmt_field(r.get('end_date')) or ''}|{r.get('image_url') or ''}"
+            )
+        payload = '\n'.join(parts)
+        digest = hashlib.md5(payload.encode('utf-8')).hexdigest()
+        return jsonify({'hash': digest})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

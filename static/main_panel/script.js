@@ -1,7 +1,10 @@
 // Variables globales
 let avisos = [];
+let avisosEnPantalla = [];
 let currentAvisoIndex = 0;
 let rotationInterval;
+let hashPollInterval;
+let ultimoHashAvisos = null;
 let currentMainCardId = null;  // Para evitar duplicados con el recuadro principal
 let usedAvisoIds = new Set();  // Para rastrear avisos ya mostrados
 let mainCardRotationIndex = 0;  // Índice específico para el recuadro principal
@@ -18,14 +21,14 @@ function actualizarHoraFecha() {
     const ampm = horas >= 12 ? 'PM' : 'AM';
     horas = horas % 12;
     horas = horas ? horas : 12;
-    const nuevaHora = `${horas}:${minutos} ${ampm}`;
+    const textoPlano = `${horas}:${minutos} ${ampm}`;
     
     // Animación suave para cambio de hora
-    if (horaElement.textContent !== nuevaHora) {
+    if (horaElement.textContent.trim() !== textoPlano) {
         horaElement.style.transform = 'scale(1.05)';
         horaElement.style.color = '#ffeb3b';
         setTimeout(() => {
-            horaElement.textContent = nuevaHora;
+            horaElement.innerHTML = `<span class="hhmm">${horas}:${minutos}</span> <span class="ampm">${ampm}</span>`;
             horaElement.style.transform = 'scale(1)';
             horaElement.style.color = '#fff';
         }, 200);
@@ -94,8 +97,10 @@ async function cargarAvisos() {
         const response = await fetch('/panel/avisos');
         const data = await response.json();
         avisos = data;
+        // Limitar el set de rotación a los 4 que están en la vista (main + 3 laterales)
+        avisosEnPantalla = obtenerAvisosInicialesDesdeDOM(avisos);
         console.log('Avisos cargados:', avisos.length);
-        if (avisos.length > 0) {
+        if (avisosEnPantalla.length > 0) {
             iniciarRotacionAvisos();
         }
     } catch (error) {
@@ -104,54 +109,16 @@ async function cargarAvisos() {
 }
 
 // Función para obtener avisos únicos para las tarjetas laterales
-function obtenerAvisosUnicos(cantidadRequerida) {
-    if (avisos.length === 0) return [];
-    
-    // Obtener el aviso que ACTUALMENTE está en el recuadro principal
-    const avisoActualPrincipal = avisos[mainCardRotationIndex % avisos.length];
-    const idAvisoActualPrincipal = avisoActualPrincipal ? avisoActualPrincipal.id : null;
-    
-    // Filtrar avisos disponibles excluyendo el principal
-    const avisosDisponibles = avisos.filter(aviso => aviso.id !== idAvisoActualPrincipal);
-    const avisosSeleccionados = [];
-    const idsUsados = new Set([idAvisoActualPrincipal]); // Incluir el ID del principal para evitarlo
-    
-    // Si hay suficientes avisos únicos
-    if (avisosDisponibles.length >= cantidadRequerida) {
-        // Usar un índice diferente para las tarjetas laterales, asegurando que sea diferente del principal
-        let startIndex = currentAvisoIndex % avisosDisponibles.length;
-        
-        for (let i = 0; i < cantidadRequerida && avisosSeleccionados.length < cantidadRequerida; i++) {
-            const avisoIndex = (startIndex + i) % avisosDisponibles.length;
-            const aviso = avisosDisponibles[avisoIndex];
-            
-            if (aviso && !idsUsados.has(aviso.id)) {
-                avisosSeleccionados.push(aviso);
-                idsUsados.add(aviso.id);
-            }
-        }
-    } else {
-        // Si no hay suficientes avisos únicos, usar los disponibles sin repetir
-        avisosDisponibles.forEach(aviso => {
-            if (avisosSeleccionados.length < cantidadRequerida && !idsUsados.has(aviso.id)) {
-                avisosSeleccionados.push(aviso);
-                idsUsados.add(aviso.id);
-            }
-        });
+function obtenerAvisosVentanaCircular(cantidadRequerida) {
+    const fuente = avisosEnPantalla.length ? avisosEnPantalla : avisos;
+    if (fuente.length === 0) return [];
+    const result = [];
+    // Principal es offset 0; laterales deben ser offsets 1..cantidad
+    for (let i = 1; i <= cantidadRequerida; i++) {
+        const idx = (mainCardRotationIndex + i) % fuente.length;
+        result.push(fuente[idx]);
     }
-    
-    // Completar con placeholders si es necesario
-    while (avisosSeleccionados.length < cantidadRequerida) {
-        avisosSeleccionados.push({
-            id: `placeholder_${Date.now()}_${avisosSeleccionados.length}`,
-            title: 'Próximamente más noticias',
-            image_url: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=400&q=80',
-            fecha_inicio: '',
-            fecha_fin: ''
-        });
-    }
-    
-    return avisosSeleccionados;
+    return result;
 }
 
 // Función para rotar avisos en las tarjetas
@@ -160,8 +127,8 @@ function rotarAvisos() {
     
     if (avisos.length === 0 || sideCards.length === 0) return;
     
-    // Obtener avisos únicos para las tarjetas laterales
-    const avisosUnicos = obtenerAvisosUnicos(sideCards.length);
+    // Avisos para laterales basados en ventana circular a partir del índice del principal
+    const avisosUnicos = obtenerAvisosVentanaCircular(sideCards.length);
     
     sideCards.forEach((card, index) => {
         const aviso = avisosUnicos[index];
@@ -173,15 +140,16 @@ function rotarAvisos() {
             
             setTimeout(() => {
                 // Actualizar contenido con animación de zoom
-                if (aviso.image_url) {
-                    card.classList.add('image-transition');
-                    card.style.backgroundImage = `url('${aviso.image_url}')`;
-                    
-                    // Remover la clase después de la animación
-                    setTimeout(() => {
-                        card.classList.remove('image-transition');
-                    }, 800);
-                }
+                const imgUrl = aviso.image_url && aviso.image_url.trim() !== ''
+                    ? aviso.image_url
+                    : 'static/main_panel/img/logo.png';
+                card.classList.add('image-transition');
+                card.style.backgroundImage = `url('${imgUrl}')`;
+                
+                // Remover la clase después de la animación
+                setTimeout(() => {
+                    card.classList.remove('image-transition');
+                }, 800);
                 
                 const overlay = card.querySelector('.side-card-overlay');
                 if (overlay) {
@@ -211,10 +179,11 @@ function rotarAvisos() {
 
 // Función para rotar tanto el aviso principal como las tarjetas laterales
 function rotarTodosLosAvisos() {
-    if (avisos.length === 0) return;
+    const fuente = avisosEnPantalla.length ? avisosEnPantalla : avisos;
+    if (fuente.length === 0) return;
     
     // Primero avanzar el índice del aviso principal
-    mainCardRotationIndex = (mainCardRotationIndex + 1) % avisos.length;
+    mainCardRotationIndex = (mainCardRotationIndex + 1) % fuente.length;
     
     // Luego rotar el aviso principal
     rotarAvisoPrincipalSincronizado();
@@ -222,8 +191,8 @@ function rotarTodosLosAvisos() {
     // Después rotar las tarjetas laterales con un pequeño delay
     setTimeout(() => {
         rotarAvisos();
-        // Avanzar el índice de las tarjetas después de usarlo
-        currentAvisoIndex = (currentAvisoIndex + 1) % Math.max(avisos.length, 1);
+        // currentAvisoIndex ya no es necesario para la ventana circular, pero lo mantenemos si en el futuro se usa
+        currentAvisoIndex = (currentAvisoIndex + 1) % Math.max((avisosEnPantalla.length ? avisosEnPantalla.length : avisos.length), 1);
     }, 200);
 }
 
@@ -246,20 +215,23 @@ function rotarAvisoPrincipalSincronizado() {
         mainCard.style.transform = 'scale(0.98)';
         
         setTimeout(() => {
-            if (avisoParaPrincipal.image_url) {
-                mainCard.classList.add('image-transition');
-                mainCard.style.backgroundImage = `url('${avisoParaPrincipal.image_url}')`;
-                
-                // Remover la clase después de la animación
-                setTimeout(() => {
-                    mainCard.classList.remove('image-transition');
-                }, 800);
-            }
+            const imgUrl = avisoParaPrincipal.image_url && avisoParaPrincipal.image_url.trim() !== ''
+                ? avisoParaPrincipal.image_url
+                : 'static/main_panel/img/logo.png';
+            mainCard.classList.add('image-transition');
+            mainCard.style.backgroundImage = `url('${imgUrl}')`;
+            
+            // Remover la clase después de la animación
+            setTimeout(() => {
+                mainCard.classList.remove('image-transition');
+            }, 800);
             
             if (mainCardText) {
                 mainCardText.innerHTML = avisoParaPrincipal.title || 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!';
                 mainCardText.dataset.avisoId = avisoParaPrincipal.id || '';
             }
+            // Actualizar badge de fecha dinámicamente
+            actualizarBadgeFechaPrincipal(avisoParaPrincipal);
             
             // Restaurar animación
             mainCard.style.opacity = '1';
@@ -268,12 +240,39 @@ function rotarAvisoPrincipalSincronizado() {
     }
 }
 
+function humanizeFecha(fechaIso) {
+    if (!fechaIso) return '';
+    try {
+        const f = new Date(fechaIso.replace(' ', 'T'));
+        const hoy = new Date();
+        const dF = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        const dA = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+        const delta = Math.round((dA - dF) / (1000*60*60*24));
+        if (delta === 0) return 'Hoy';
+        if (delta === 1) return 'Mañana';
+        if (delta > 1 && delta <= 7) return `En ${delta} días`;
+        const dd = dA.getDate().toString().padStart(2, '0');
+        const mm = (dA.getMonth()+1).toString().padStart(2, '0');
+        const yyyy = dA.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    } catch (e) { return ''; }
+}
+
+function actualizarBadgeFechaPrincipal(aviso) {
+    const badge = document.querySelector('.main-card-badge');
+    if (!badge) return;
+    const label = humanizeFecha(aviso.fecha_inicio);
+    badge.textContent = label;
+    badge.style.display = label ? 'block' : 'none';
+}
+
 // Función para obtener el siguiente aviso para el recuadro principal
 function obtenerSiguienteAvisoParaPrincipal() {
-    if (avisos.length === 0) return null;
+    const fuente = avisosEnPantalla.length ? avisosEnPantalla : avisos;
+    if (fuente.length === 0) return null;
     
     // Obtener el aviso en el índice actual del recuadro principal
-    return avisos[mainCardRotationIndex % avisos.length];
+    return fuente[mainCardRotationIndex % fuente.length];
 }
 
 // Función para iniciar la rotación de avisos
@@ -286,6 +285,41 @@ function iniciarRotacionAvisos() {
         clearInterval(rotationInterval);
     }
     rotationInterval = setInterval(rotarTodosLosAvisos, 8000);
+
+    // Programar recarga completa cada 10 minutos
+    if (hashPollInterval) {
+        clearInterval(hashPollInterval);
+    }
+    // Chequear cambios cada 5s; recargar si cambia el hash. Además, forzar reload cada 10 minutos
+    const startTime = Date.now();
+    const checkHash = async () => {
+        try {
+            const r = await fetch('/panel/avisos_hash');
+            const j = await r.json();
+            if (j && j.hash) {
+                if (!ultimoHashAvisos) {
+                    ultimoHashAvisos = j.hash;
+                } else if (ultimoHashAvisos !== j.hash) {
+                    location.reload();
+                }
+            }
+        } catch (e) {
+            // ignorar errores transitorios
+        }
+        if (Date.now() - startTime > 10 * 60 * 1000) {
+            location.reload();
+        }
+    };
+    // Primera comprobación inmediata
+    checkHash();
+    // Intervalo periódico
+    hashPollInterval = setInterval(checkHash, 5000);
+    // Al volver a la pestaña, comprobar de nuevo
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            checkHash();
+        }
+    });
 }
 
 
@@ -317,6 +351,29 @@ function obtenerIdAvisoPrincipalInicial() {
     if (mainCardText && mainCardText.dataset && mainCardText.dataset.avisoId) {
         currentMainCardId = parseInt(mainCardText.dataset.avisoId);
     }
+
+    // Construir lista inicial a partir del DOM: principal + laterales
+    const sideCards = Array.from(document.querySelectorAll('.side-card'));
+    const idsSide = sideCards
+        .map(c => parseInt(c.getAttribute('data-aviso-id'))) 
+        .filter(v => !Number.isNaN(v));
+    const ids = [];
+    if (!Number.isNaN(currentMainCardId)) ids.push(currentMainCardId);
+    ids.push(...idsSide);
+    // Mapear a objetos de avisos ya cargados cuando llegue la API
+    window.__idsInicialesAvisos = ids;
+}
+
+function obtenerAvisosInicialesDesdeDOM(listaAvisosApi) {
+    if (!window.__idsInicialesAvisos || !Array.isArray(window.__idsInicialesAvisos)) return listaAvisosApi.slice(0, 4);
+    const byId = new Map(listaAvisosApi.map(a => [a.id, a]));
+    const result = [];
+    window.__idsInicialesAvisos.forEach(id => {
+        const a = byId.get(id);
+        if (a) result.push(a);
+    });
+    // Asegurar máximo 4
+    return result.slice(0, 4);
 }
 
 // Inicialización

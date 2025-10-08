@@ -128,6 +128,9 @@ body {
     text-align: center;
     margin-top: 10px;
 }
+/* Subpartes de la hora para control fino */
+.time .hhmm { display: inline-block; }
+.time .ampm { display: inline-block; font-size: 0.45em; vertical-align: top; margin-left: 6px; }
 .right-section {
     display: flex;
     justify-content: flex-end;
@@ -294,4 +297,69 @@ body {
         min-width: 0;
         width: 100%;
     }
+}
+
+/* ===================== Responsive - Móviles ===================== */
+@media (max-width: 600px) {
+    body {
+        overflow: auto;
+        height: auto;
+        background: #222;
+    }
+    .header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        grid-template-columns: none;
+        height: auto;
+        row-gap: 6px;
+        padding: 8px 10px;
+        text-align: center;
+    }
+    .left-section, .center-section, .right-section { width: 100%; display:flex; align-items:center; justify-content:center; }
+    .logo-area { justify-content: center; gap: 8px; }
+    .logo { height: 44px; margin-right: 0; }
+    .school-name { font-size: 13px; line-height: 1.1; }
+    .time { font-size: 28px; font-weight: 700; margin-top: 0; line-height: 1; letter-spacing: 0.5px; white-space: nowrap; }
+    .time .ampm { font-size: 0.5em; margin-left: 4px; }
+    .center-section { order: 2; }
+    .right-section { order: 3; justify-content: center; transform: none; gap: 4px; flex-direction: column; }
+    .weather-info { gap: 6px; margin-right: 0; }
+    .weather-icon { font-size: 22px; }
+    .temperature { font-size: 16px; }
+    .weather-description { font-size: 10px; }
+    .weather-details { align-items: center; }
+    .date { font-size: 14px; margin-left: 0; }
+
+    .main-content {
+        margin: 12px;
+        gap: 12px;
+    }
+    .main-card {
+        min-height: 260px;
+        border-radius: 16px;
+    }
+    .main-card-overlay { border-radius: 16px; background: transparent; }
+    .main-card-text {
+        font-size: 20px;
+        padding: 0 0 16px 16px;
+        max-width: 92%;
+    }
+    .main-card-badge {
+        font-size: 16px !important;
+        padding: 6px 10px !important;
+        bottom: 10px !important;
+        right: 10px !important;
+        border-radius: 8px !important;
+    }
+
+    .side-cards { gap: 12px; }
+    .side-card {
+        min-height: 120px;
+        border-radius: 12px;
+    }
+    .side-card-overlay { padding: 12px; background: transparent; }
+    .side-card-date { font-size: 12px; margin-bottom: 4px; }
+    .side-card-title { font-size: 16px; }
 }
