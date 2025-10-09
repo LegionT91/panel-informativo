@@ -96,7 +96,7 @@ def humanize_main_date(start_dt):
             return 'Hoy'
         if delta_days == 1:
             return 'Mañana'
-        if 1 < delta_days <= 7:
+        if 1 < delta_days <= 30:
             return f'{delta_days} días'
         return d.strftime('%d/%m/%Y')
     except Exception:

@@ -78,14 +78,14 @@
     .main-card-overlay, .side-card-overlay { position: relative; z-index: 1; }
 
     /* Bind idle variants to the ::before layer */
-    .kb-main-zoom-in::before { animation: kbZoomIn 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-main-zoom-out::before { animation: kbZoomOut 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-main-pan-left::before { animation: kbPanLeft 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-main-pan-right::before { animation: kbPanRight 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-side-zoom-in::before { animation: kbZoomIn 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-side-zoom-out::before { animation: kbZoomOut 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-side-pan-left::before { animation: kbZoomIn 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
-    .kb-side-pan-right::before { animation: kbZoomIn 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-main-zoom-in::before { animation: kbZoomIn 9s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-main-zoom-out::before { animation: kbZoomOut 9s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-main-pan-left::before { animation: kbPanLeft 9s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-main-pan-right::before { animation: kbPanRight 9s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-side-zoom-in::before { animation: kbZoomIn 8s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-side-zoom-out::before { animation: kbZoomOut 8s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-side-pan-left::before { animation: kbZoomIn 8s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
+    .kb-side-pan-right::before { animation: kbZoomIn 8s ease-in-out infinite alternate; animation-delay: var(--kb-offset, 0s); }
     </style>
 </head>
 <body>
@@ -143,11 +143,9 @@
                 <div class="main-card-text" data-aviso-id="{{ main_card.id or '' }}">
                     {{ main_card.titulo|safe }}
                 </div>
-                {% if main_card.etiqueta_fecha %}
-                <div class="main-card-badge" style="position:absolute;bottom:16px;right:16px;background:rgba(0,0,0,0.65);color:#fff;padding:12px 18px;border-radius:10px;font-weight:800;font-size:32px;line-height:1.1;letter-spacing:0.2px;box-shadow:0 4px 12px rgba(0,0,0,0.25);">
-                    {{ main_card.etiqueta_fecha }}
+                <div id="dynamic-badge" class="main-card-badge" style="position:absolute;bottom:16px;right:16px;background:rgba(0,0,0,0.65);color:#fff;padding:12px 18px;border-radius:10px;font-weight:800;font-size:32px;line-height:1.1;letter-spacing:0.2px;box-shadow:0 4px 12px rgba(0,0,0,0.25);">
+                    {{ main_card.etiqueta_fecha or '' }}
                 </div>
-                {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -178,6 +176,48 @@
         if (!Array.isArray(rotables) || rotables.length === 0) return;
 
         // Utilidades
+        function parseDateFromAny(input) {
+            if (!input) return null;
+            try {
+                if (typeof input === 'string') {
+                    const s = input.trim();
+                    // DD/MM/YYYY or DD/MM/YYYY HH:MM
+                    const m = /^([0-3]?\d)\/(0?\d|1[0-2])\/(\d{4})(?:\s+([0-2]?\d):([0-5]?\d))?$/.exec(s);
+                    if (m) {
+                        const day = parseInt(m[1], 10);
+                        const month = parseInt(m[2], 10);
+                        const year = parseInt(m[3], 10);
+                        const hh = m[4] ? parseInt(m[4], 10) : 0;
+                        const mm = m[5] ? parseInt(m[5], 10) : 0;
+                        return new Date(year, month - 1, day, hh, mm, 0, 0);
+                    }
+                    // ISO-like YYYY-MM-DD[ T]HH:MM[:SS]
+                    let iso = s.replace(' ', 'T');
+                    if (/^\d{4}-\d{2}-\d{2}([T\s].*)?$/.test(iso)) {
+                        const timePart = iso.split('T')[1];
+                        if (timePart && timePart.length === 5) iso += ':00';
+                        const d = new Date(iso);
+                        if (!isNaN(d.getTime())) return d;
+                    }
+                    // Fallback
+                    const d2 = new Date(s);
+                    return isNaN(d2.getTime()) ? null : d2;
+                } else if (input instanceof Date) {
+                    return isNaN(input.getTime()) ? null : input;
+                }
+                return null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function formatDDMMYYYY(date) {
+            if (!(date instanceof Date) || isNaN(date.getTime())) return '';
+            const dd = String(date.getDate()).padStart(2, '0');
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const yyyy = String(date.getFullYear());
+            return `${dd}/${mm}/${yyyy}`;
+        }
         function setMainCard(item) {
             try {
                 const mainCardEl = document.querySelector('.main-card');
@@ -199,7 +239,7 @@
                     badgeText = item.etiqueta_fecha;
                 } else if (item.fecha_inicio) {
                     // Calcular proximidad desde fecha de inicio respecto a "hoy"
-                    const start = new Date(item.fecha_inicio);
+                    const start = parseDateFromAny(item.fecha_inicio);
                     if (!isNaN(start.getTime())) {
                         const today = new Date();
                         const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -210,14 +250,11 @@
                             badgeText = 'Hoy';
                         } else if (delta === 1) {
                             badgeText = 'Mañana';
-                        } else if (delta > 1 && delta <= 7) {
+                        } else if (delta > 1 && delta <= 30) {
                             badgeText = `${delta} días`;
                         } else {
                             // Mostrar solo la fecha de inicio en formato dd/mm/yyyy
-                            const dd = String(start.getDate()).padStart(2, '0');
-                            const mm = String(start.getMonth() + 1).padStart(2, '0');
-                            const yyyy = String(start.getFullYear());
-                            badgeText = `${dd}/${mm}/${yyyy}`;
+                            badgeText = formatDDMMYYYY(start);
                         }
                     }
                 }
@@ -281,30 +318,25 @@
         let current = 0;
         // Estado para idle variations
         let lastMainIdleClass = '';
-        const mainIdleClasses = ['kb-main-zoom-in', 'kb-main-zoom-out', 'kb-main-pan-left', 'kb-main-pan-right'];
-        const sideIdleClasses = ['kb-side-zoom-in', 'kb-side-zoom-out', 'kb-side-pan-left', 'kb-side-pan-right'];
 
         function applyIdleVariationMain() {
             const main = document.querySelector('.main-card');
             if (!main) return;
-            if (lastMainIdleClass) main.classList.remove(lastMainIdleClass);
-            const pick = mainIdleClasses[(current * 131 + Date.now()) % mainIdleClasses.length];
-            lastMainIdleClass = pick;
-            main.classList.add(pick);
-            // Pequeño offset para la animación del fondo principal
-            main.style.setProperty('--kb-delay', '0.05s');
+            // limpiar posibles clases kb-main-*
+            ['kb-main-zoom-in','kb-main-zoom-out','kb-main-pan-left','kb-main-pan-right'].forEach(c => main.classList.remove(c));
+            lastMainIdleClass = 'kb-main-zoom-in';
+            main.classList.add('kb-main-zoom-in');
+            // delay negativo suave
+            main.style.setProperty('--kb-offset', '-0.15s');
         }
 
         function applyIdleVariationSideCards() {
             const sideCards = document.querySelectorAll('.side-card');
             sideCards.forEach((el, i) => {
-                // limpiar clases previas kb-side-*
-                sideIdleClasses.forEach(c => el.classList.remove(c));
-                const idx = (current + i * 97 + Date.now()) % sideIdleClasses.length;
-                const pick = sideIdleClasses[idx];
-                el.classList.add(pick);
-                // Offsets más sutiles para que no animen tan desfasadas
-                el.style.setProperty('--kb-delay', `${0.08 + i * 0.04}s`);
+                ['kb-side-zoom-in','kb-side-zoom-out','kb-side-pan-left','kb-side-pan-right'].forEach(c => el.classList.remove(c));
+                el.classList.add('kb-side-zoom-in');
+                const offsets = [-0.06, -0.12, -0.18, -0.24];
+                el.style.setProperty('--kb-offset', offsets[i % offsets.length] + 's');
             });
         }
 
