@@ -555,8 +555,7 @@ def register_routes(app):
             
             if img_field:
                 filename = os.path.basename(img_field)
-                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                upload_folder = os.path.join(base_dir, UPLOAD_FOLDER)
+                upload_folder = os.path.join(current_app.static_folder, 'uploads')
                 file_path = os.path.join(upload_folder, filename)
                 try:
                     if os.path.exists(file_path):
@@ -618,8 +617,7 @@ def register_routes(app):
                 return redirect(url_for('panel'))
             
             filename = secure_filename(file.filename)
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            upload_folder = os.path.join(base_dir, UPLOAD_FOLDER)
+            upload_folder = os.path.join(current_app.static_folder, 'uploads')
             os.makedirs(upload_folder, exist_ok=True)
             save_path = os.path.join(upload_folder, filename)
             
@@ -692,8 +690,7 @@ def register_routes(app):
             return jsonify({'error': 'Tipo de archivo no permitido. Usa png/jpg/jpeg/gif/webp'}), 400
 
         filename = secure_filename(file.filename)
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        upload_folder = os.path.join(base_dir, UPLOAD_FOLDER)
+        upload_folder = os.path.join(current_app.static_folder, 'uploads')
         os.makedirs(upload_folder, exist_ok=True)
         save_path = os.path.join(upload_folder, filename)
         
