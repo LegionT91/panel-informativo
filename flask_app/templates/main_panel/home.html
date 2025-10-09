@@ -7,6 +7,86 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='main_panel/style.css') }}">
+    <style>
+    /* Animaciones bounce para rotación */
+    @keyframes bounceIn {
+        0% { opacity: 0; transform: translateY(18px); }
+        50% { opacity: 1; transform: translateY(-6px); }
+        80% { transform: translateY(2px); }
+        100% { transform: translateY(0); }
+    }
+    @keyframes bounceInSmall {
+        0% { opacity: 0; transform: translateY(10px); }
+        60% { opacity: 1; transform: translateY(-3px); }
+        85% { transform: translateY(1px); }
+        100% { transform: translateY(0); }
+    }
+    .bounce-in {
+        animation: bounceIn 800ms cubic-bezier(.22,.61,.36,1) both;
+        will-change: transform, opacity;
+    }
+    .bounce-in-small {
+        animation: bounceInSmall 700ms cubic-bezier(.22,.61,.36,1) both;
+        will-change: transform, opacity;
+    }
+
+    /* Ken Burns/idle animations (subtle background zoom/pan to keep the screen alive) */
+    @keyframes kbZoomIn {
+        0% { transform: scale(1); background-position: 50% 50%; }
+        100% { transform: scale(1.18); background-position: 50% 50%; }
+    }
+    @keyframes kbZoomOut {
+        0% { transform: scale(1.18); background-position: 50% 50%; }
+        100% { transform: scale(1); background-position: 50% 50%; }
+    }
+    @keyframes kbPanLeft {
+        0% { background-position: 54% 50%; }
+        100% { background-position: 46% 50%; }
+    }
+    @keyframes kbPanRight {
+        0% { background-position: 46% 50%; }
+        100% { background-position: 54% 50%; }
+    }
+    /* Main card idle variants */
+    .kb-main-zoom-in { animation: kbZoomIn 8s ease-in-out infinite alternate; }
+    .kb-main-zoom-out { animation: kbZoomOut 8s ease-in-out infinite alternate; }
+    .kb-main-pan-left { animation: kbPanLeft 14s ease-in-out infinite alternate; }
+    .kb-main-pan-right { animation: kbPanRight 14s ease-in-out infinite alternate; }
+    /* Side card idle variants (shorter, slightly faster) */
+    .kb-side-zoom-in { animation: kbZoomIn 7s ease-in-out infinite alternate; }
+    .kb-side-zoom-out { animation: kbZoomOut 7s ease-in-out infinite alternate; }
+    .kb-side-pan-left { animation: kbPanLeft 10s ease-in-out infinite alternate; }
+    .kb-side-pan-right { animation: kbPanRight 10s ease-in-out infinite alternate; }
+
+    /* Dedicated background layer to ensure zoom/pan is visible regardless of other styles */
+    .main-card, .side-card { position: relative; overflow: hidden; background: transparent !important; animation: none !important; transform: none !important; }
+    .main-card::before, .side-card::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-image: var(--bg-url);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        transform-origin: center;
+        will-change: transform, background-position;
+        backface-visibility: hidden;
+        pointer-events: none;
+        z-index: 0;
+    }
+    /* Ensure text overlays stay above */
+    .main-card-overlay, .side-card-overlay { position: relative; z-index: 1; }
+
+    /* Bind idle variants to the ::before layer */
+    .kb-main-zoom-in::before { animation: kbZoomIn 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-main-zoom-out::before { animation: kbZoomOut 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-main-pan-left::before { animation: kbPanLeft 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-main-pan-right::before { animation: kbPanRight 12s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-side-zoom-in::before { animation: kbZoomIn 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-side-zoom-out::before { animation: kbZoomOut 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-side-pan-left::before { animation: kbZoomIn 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    .kb-side-pan-right::before { animation: kbZoomIn 10s ease-in-out infinite alternate; animation-delay: var(--kb-delay, 0s); }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -33,7 +113,7 @@
         </div>
     </div>
     <div class="main-content">
-        <div class="main-card" style="background-image:url('{{ main_card.imagen_url }}');">
+        <div class="main-card" style="--bg-url:url('{{ main_card.imagen_url }}');">
             <div class="main-card-overlay">
                 {% if main_card.id == 'empty_database' %}
                 <div class="main-card-text empty-state" data-aviso-id="{{ main_card.id or '' }}">
@@ -73,7 +153,7 @@
         </div>
         <div class="side-cards">
             {% for evento in eventos %}
-            <div class="side-card" data-aviso-id="{{ evento.id or '' }}" style="background-image:url('{{ evento.imagen_url }}');">
+            <div class="side-card" data-aviso-id="{{ evento.id or '' }}" style="--bg-url:url('{{ evento.imagen_url }}');">
                 <div class="side-card-overlay">
                     <div class="side-card-date">
                         {{ evento.fecha_inicio }} - {{ evento.fecha_fin }}
@@ -87,5 +167,187 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='main_panel/script.js') }}"></script>
+    <script>
+    // Rotación automática de avisos (main + side cards)
+    (function() {
+        // Preparar datos desde el servidor
+        const mainCard = {{ main_card|tojson }};
+        const eventosData = {{ eventos|tojson }};
+        const rotables = [mainCard, ...eventosData];
+
+        if (!Array.isArray(rotables) || rotables.length === 0) return;
+
+        // Utilidades
+        function setMainCard(item) {
+            try {
+                const mainCardEl = document.querySelector('.main-card');
+                const overlayEl = document.querySelector('.main-card-overlay');
+                const textEl = document.querySelector('.main-card-text');
+                if (!mainCardEl || !overlayEl || !textEl) return;
+
+                const bg = item.imagen_url || (item.imagen || '');
+                if (bg) {
+                    mainCardEl.style.removeProperty('background-image');
+                    mainCardEl.style.setProperty('--bg-url', `url('${bg}')`);
+                }
+                textEl.innerHTML = (item.titulo || item.title || '').toString();
+
+                // Badge dinámico
+                let badgeText = '';
+                // Preferir etiqueta generada por backend
+                if (item.etiqueta_fecha) {
+                    badgeText = item.etiqueta_fecha;
+                } else if (item.fecha_inicio) {
+                    // Calcular proximidad desde fecha de inicio respecto a "hoy"
+                    const start = new Date(item.fecha_inicio);
+                    if (!isNaN(start.getTime())) {
+                        const today = new Date();
+                        const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                        const msPerDay = 24 * 60 * 60 * 1000;
+                        const delta = Math.round((startDate - todayDate) / msPerDay);
+                        if (delta === 0) {
+                            badgeText = 'Hoy';
+                        } else if (delta === 1) {
+                            badgeText = 'Mañana';
+                        } else if (delta > 1 && delta <= 7) {
+                            badgeText = `${delta} días`;
+                        } else {
+                            // Mostrar solo la fecha de inicio en formato dd/mm/yyyy
+                            const dd = String(start.getDate()).padStart(2, '0');
+                            const mm = String(start.getMonth() + 1).padStart(2, '0');
+                            const yyyy = String(start.getFullYear());
+                            badgeText = `${dd}/${mm}/${yyyy}`;
+                        }
+                    }
+                }
+
+                let badgeEl = overlayEl.querySelector('#dynamic-badge');
+                if (!badgeEl) {
+                    badgeEl = document.createElement('div');
+                    badgeEl.id = 'dynamic-badge';
+                    badgeEl.className = 'main-card-badge';
+                    badgeEl.style.position = 'absolute';
+                    badgeEl.style.bottom = '16px';
+                    badgeEl.style.right = '16px';
+                    badgeEl.style.background = 'rgba(0,0,0,0.65)';
+                    badgeEl.style.color = '#fff';
+                    badgeEl.style.padding = '12px 18px';
+                    badgeEl.style.borderRadius = '10px';
+                    badgeEl.style.fontWeight = '800';
+                    badgeEl.style.fontSize = '32px';
+                    badgeEl.style.lineHeight = '1.1';
+                    badgeEl.style.letterSpacing = '0.2px';
+                    badgeEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
+                    overlayEl.appendChild(badgeEl);
+                }
+                badgeEl.textContent = badgeText || '';
+                badgeEl.style.display = badgeText ? 'block' : 'none';
+            } catch (e) {
+                console.warn('Error actualizando main card:', e);
+            }
+        }
+
+        function renderSideCards(startIndex) {
+            try {
+                const container = document.querySelector('.side-cards');
+                if (!container) return;
+                const n = rotables.length;
+                const items = [];
+                // Mostrar los 3 siguientes a partir de startIndex (excluyendo el main actual)
+                for (let i = 1; i <= Math.min(3, n - 1); i++) {
+                    const idx = (startIndex + i) % n;
+                    items.push(rotables[idx]);
+                }
+                const html = items.map(ev => {
+                    const bg = ev.imagen_url || ev.imagen || '';
+                    const titulo = (ev.titulo || ev.title || '').toString();
+                    const fecha = (ev.fecha_inicio || '') + ((ev.fecha_inicio && ev.fecha_fin) ? ' - ' : '') + (ev.fecha_fin || '');
+                    return `
+                        <div class="side-card" data-aviso-id="${ev.id || ''}" style="--bg-url:url('${bg}');">
+                            <div class="side-card-overlay">
+                                <div class="side-card-date">${fecha}</div>
+                                <div class="side-card-title">${titulo}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                container.innerHTML = html;
+            } catch (e) {
+                console.warn('Error actualizando side cards:', e);
+            }
+        }
+
+        let current = 0;
+        // Estado para idle variations
+        let lastMainIdleClass = '';
+        const mainIdleClasses = ['kb-main-zoom-in', 'kb-main-zoom-out', 'kb-main-pan-left', 'kb-main-pan-right'];
+        const sideIdleClasses = ['kb-side-zoom-in', 'kb-side-zoom-out', 'kb-side-pan-left', 'kb-side-pan-right'];
+
+        function applyIdleVariationMain() {
+            const main = document.querySelector('.main-card');
+            if (!main) return;
+            if (lastMainIdleClass) main.classList.remove(lastMainIdleClass);
+            const pick = mainIdleClasses[(current * 131 + Date.now()) % mainIdleClasses.length];
+            lastMainIdleClass = pick;
+            main.classList.add(pick);
+            // Pequeño offset para la animación del fondo principal
+            main.style.setProperty('--kb-delay', '0.05s');
+        }
+
+        function applyIdleVariationSideCards() {
+            const sideCards = document.querySelectorAll('.side-card');
+            sideCards.forEach((el, i) => {
+                // limpiar clases previas kb-side-*
+                sideIdleClasses.forEach(c => el.classList.remove(c));
+                const idx = (current + i * 97 + Date.now()) % sideIdleClasses.length;
+                const pick = sideIdleClasses[idx];
+                el.classList.add(pick);
+                // Offsets más sutiles para que no animen tan desfasadas
+                el.style.setProperty('--kb-delay', `${0.08 + i * 0.04}s`);
+            });
+        }
+
+        function renderAll() {
+            setMainCard(rotables[current]);
+            renderSideCards(current);
+            // Animar elementos
+            try {
+                const mainText = document.querySelector('.main-card-text');
+                const badge = document.getElementById('dynamic-badge');
+                const sideCards = document.querySelectorAll('.side-card-overlay');
+
+                const restart = (el, cls) => {
+                    if (!el) return;
+                    el.classList.remove(cls);
+                    // forzar reflow para reiniciar la animación
+                    void el.offsetWidth;
+                    el.classList.add(cls);
+                };
+
+                restart(mainText, 'bounce-in');
+                if (badge) restart(badge, 'bounce-in');
+                sideCards.forEach((el, i) => {
+                    // Pequeño escalonado para un efecto agradable
+                    setTimeout(() => restart(el, 'bounce-in-small'), i * 120);
+                });
+            } catch (e) { /* noop */ }
+
+            // Aplicar variaciones de idle (zoom/pan) para mantener vida en pantalla
+            applyIdleVariationMain();
+            applyIdleVariationSideCards();
+        }
+
+        // Render inicial
+        document.addEventListener('DOMContentLoaded', function() {
+            renderAll();
+            // Intervalo de rotación (10s)
+            setInterval(function() {
+                current = (current + 1) % rotables.length;
+                renderAll();
+            }, 10000);
+        });
+    })();
+    </script>
 </body>
 </html>
