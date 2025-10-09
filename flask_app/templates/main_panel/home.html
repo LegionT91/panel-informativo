@@ -299,11 +299,32 @@
                 const html = items.map(ev => {
                     const bg = ev.imagen_url || ev.imagen || '';
                     const titulo = (ev.titulo || ev.title || '').toString();
-                    const fecha = (ev.fecha_inicio || '') + ((ev.fecha_inicio && ev.fecha_fin) ? ' - ' : '') + (ev.fecha_fin || '');
+                    // Calcular etiqueta de fecha similar al main-card
+                    let etiqueta = '';
+                    if (ev.etiqueta_fecha) {
+                        etiqueta = ev.etiqueta_fecha;
+                    } else if (ev.fecha_inicio) {
+                        const start = parseDateFromAny(ev.fecha_inicio);
+                        if (start) {
+                            const today = new Date();
+                            const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                            const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                            const msPerDay = 24 * 60 * 60 * 1000;
+                            const delta = Math.round((startDate - todayDate) / msPerDay);
+                            if (delta === 0) etiqueta = 'Hoy';
+                            else if (delta === 1) etiqueta = 'Mañana';
+                            else if (delta > 1 && delta <= 30) etiqueta = `${delta} días`;
+                            else etiqueta = formatDDMMYYYY(start);
+                        }
+                    }
+                    if (!etiqueta && ev.fecha_fin) {
+                        const end = parseDateFromAny(ev.fecha_fin);
+                        if (end) etiqueta = formatDDMMYYYY(end);
+                    }
                     return `
                         <div class="side-card" data-aviso-id="${ev.id || ''}" style="--bg-url:url('${bg}');">
                             <div class="side-card-overlay">
-                                <div class="side-card-date">${fecha}</div>
+                                <div class="side-card-date">${etiqueta}</div>
                                 <div class="side-card-title">${titulo}</div>
                             </div>
                         </div>
