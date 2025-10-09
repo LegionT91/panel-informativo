@@ -2,6 +2,7 @@
 Aplicación Flask modularizada
 """
 from flask import Flask
+from flask import send_from_directory
 from flask_login import LoginManager
 from flask_app.controllers import register_routes, require_login_for_panel, handle_needs_login
 from flask_app.config.mysqlconnection import connectToMySQL
@@ -35,15 +36,29 @@ def create_app():
             pass
         return None
     
-    # Registrar middleware
-    require_login_for_panel(app)
+    # Registrar handler de login primero
+    handle_needs_login(app)
     
     # Registrar todas las rutas
     register_routes(app)
     
+    # Registrar middleware después de que las rutas estén disponibles
+    require_login_for_panel(app)
+    
     # Crear carpeta de uploads si no existe
     full_upload_path = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
     os.makedirs(full_upload_path, exist_ok=True)
+    
+    # Configurar ruta estática para la carpeta uploads
+    @app.route('/uploads/<filename>')
+    def uploaded_file(filename):
+            # En lugar de usar send_static_file con "static/uploads/..." (que genera
+            # rutas tipo /static/static/...), servimos directamente desde el
+            # directorio configurado para uploads.
+            upload_dir = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+            # send_from_directory toma la ruta del directorio y el nombre de archivo;
+            # así evitamos prefijos duplicados en la URL.
+            return send_from_directory(upload_dir, filename)
     
     return app
 

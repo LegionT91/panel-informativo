@@ -11,41 +11,65 @@ let mainCardRotationIndex = 0;  // Índice específico para el recuadro principa
 
 // Función para actualizar hora y fecha con animaciones suaves
 function actualizarHoraFecha() {
-    const ahora = new Date();
-    const horaElement = document.getElementById('hora-actual');
-    const fechaElement = document.getElementById('fecha-actual');
-    
-    // Hora
-    let horas = ahora.getHours();
-    const minutos = ahora.getMinutes().toString().padStart(2, '0');
-    const ampm = horas >= 12 ? 'PM' : 'AM';
-    horas = horas % 12;
-    horas = horas ? horas : 12;
-    const textoPlano = `${horas}:${minutos} ${ampm}`;
-    
-    // Animación suave para cambio de hora
-    if (horaElement.textContent.trim() !== textoPlano) {
-        horaElement.style.transform = 'scale(1.05)';
-        horaElement.style.color = '#ffeb3b';
-        setTimeout(() => {
-            horaElement.innerHTML = `<span class="hhmm">${horas}:${minutos}</span> <span class="ampm">${ampm}</span>`;
-            horaElement.style.transform = 'scale(1)';
-            horaElement.style.color = '#fff';
-        }, 200);
-    }
-    
-    // Fecha
-    const dia = ahora.getDate().toString().padStart(2, '0');
-    const mes = (ahora.getMonth() + 1).toString().padStart(2, '0');
-    const anio = ahora.getFullYear();
-    const nuevaFecha = `${dia}/${mes}/${anio}`;
-    
-    if (fechaElement.textContent !== nuevaFecha) {
-        fechaElement.style.transform = 'scale(1.02)';
-        setTimeout(() => {
+    try {
+        const ahora = new Date();
+        const horaElement = document.getElementById('hora-actual');
+        const fechaElement = document.getElementById('fecha-actual');
+        
+        // Debug: verificar si los elementos existen
+        if (!horaElement) {
+            console.error('Elemento hora-actual no encontrado');
+            return;
+        }
+        if (!fechaElement) {
+            console.error('Elemento fecha-actual no encontrado');
+            return;
+        }
+        
+        // Hora
+        let horas = ahora.getHours();
+        const minutos = ahora.getMinutes().toString().padStart(2, '0');
+        const ampm = horas >= 12 ? 'PM' : 'AM';
+        horas = horas % 12;
+        horas = horas ? horas : 12;
+        const textoPlano = horas + ':' + minutos + ' ' + ampm;
+        
+        // Actualizar hora inmediatamente si está vacía
+        if (!horaElement.textContent.trim()) {
+            horaElement.innerHTML = '<span class="hhmm">' + horas + ':' + minutos + '</span> <span class="ampm">' + ampm + '</span>';
+        }
+        
+        // Animación suave para cambio de hora
+        if (horaElement.textContent.trim() !== textoPlano) {
+            horaElement.style.transform = 'scale(1.05)';
+            horaElement.style.color = '#ffeb3b';
+            setTimeout(() => {
+                horaElement.innerHTML = '<span class="hhmm">' + horas + ':' + minutos + '</span> <span class="ampm">' + ampm + '</span>';
+                horaElement.style.transform = 'scale(1)';
+                horaElement.style.color = '#fff';
+            }, 200);
+        }
+        
+        // Fecha
+        const dia = ahora.getDate().toString().padStart(2, '0');
+        const mes = (ahora.getMonth() + 1).toString().padStart(2, '0');
+        const anio = ahora.getFullYear();
+        const nuevaFecha = dia + '/' + mes + '/' + anio;
+        
+        // Actualizar fecha inmediatamente si está vacía
+        if (!fechaElement.textContent.trim()) {
             fechaElement.textContent = nuevaFecha;
-            fechaElement.style.transform = 'scale(1)';
-        }, 200);
+        }
+        
+        if (fechaElement.textContent !== nuevaFecha) {
+            fechaElement.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                fechaElement.textContent = nuevaFecha;
+                fechaElement.style.transform = 'scale(1)';
+            }, 200);
+        }
+    } catch (error) {
+        console.error('Error en actualizarHoraFecha:', error);
     }
 }
 
@@ -142,7 +166,7 @@ function rotarAvisos() {
                 // Actualizar contenido con animación de zoom
                 const imgUrl = aviso.image_url && aviso.image_url.trim() !== ''
                     ? aviso.image_url
-                    : 'static/main_panel/img/logo.png';
+                    : '/static/main_panel/img/logo.png';
                 card.classList.add('image-transition');
                 card.style.backgroundImage = `url('${imgUrl}')`;
                 
@@ -217,7 +241,7 @@ function rotarAvisoPrincipalSincronizado() {
         setTimeout(() => {
             const imgUrl = avisoParaPrincipal.image_url && avisoParaPrincipal.image_url.trim() !== ''
                 ? avisoParaPrincipal.image_url
-                : 'static/main_panel/img/logo.png';
+                : '/static/main_panel/img/logo.png';
             mainCard.classList.add('image-transition');
             mainCard.style.backgroundImage = `url('${imgUrl}')`;
             
@@ -285,40 +309,145 @@ function iniciarRotacionAvisos() {
         clearInterval(rotationInterval);
     }
     rotationInterval = setInterval(rotarTodosLosAvisos, 8000);
+}
 
-    // Programar recarga completa cada 10 minutos
+// Función para mostrar notificación de actualización
+function mostrarNotificacionActualizacion() {
+    // Crear elemento de notificación
+    const notificacion = document.createElement('div');
+    notificacion.id = 'notificacion-actualizacion';
+    notificacion.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #4CAF50, #45a049);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 10000;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideInRight 0.5s ease-out;
+        max-width: 300px;
+    `;
+    
+    notificacion.innerHTML = `
+        <div style="
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        "></div>
+        <span>Actualizando noticias...</span>
+    `;
+    
+    // Agregar estilos CSS para las animaciones
+    if (!document.getElementById('notificacion-estilos')) {
+        const estilos = document.createElement('style');
+        estilos.id = 'notificacion-estilos';
+        estilos.textContent = `
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(estilos);
+    }
+    
+    // Agregar al DOM
+    document.body.appendChild(notificacion);
+    
+    // Remover después de 3 segundos
+    setTimeout(() => {
+        if (notificacion.parentNode) {
+            notificacion.style.animation = 'slideInRight 0.3s ease-in reverse';
+            setTimeout(() => {
+                if (notificacion.parentNode) {
+                    notificacion.remove();
+                }
+            }, 300);
+        }
+    }, 3000);
+}
+
+// Función para iniciar el sistema de polling de cambios
+function iniciarPollingCambios() {
+    // Limpiar intervalos existentes
     if (hashPollInterval) {
         clearInterval(hashPollInterval);
     }
-    // Chequear cambios cada 5s; recargar si cambia el hash. Además, forzar reload cada 10 minutos
-    const startTime = Date.now();
-    const checkHash = async () => {
+    
+    // Función para verificar cambios en la base de datos
+    const verificarCambios = async () => {
         try {
-            const r = await fetch('/panel/avisos_hash');
-            const j = await r.json();
-            if (j && j.hash) {
+            const response = await fetch('/panel/avisos_hash');
+            if (!response.ok) {
+                console.warn('Error al verificar cambios:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            if (data && data.hash) {
                 if (!ultimoHashAvisos) {
-                    ultimoHashAvisos = j.hash;
-                } else if (ultimoHashAvisos !== j.hash) {
-                    location.reload();
+                    // Primera vez, solo guardar el hash
+                    ultimoHashAvisos = data.hash;
+                    console.log('Hash inicial establecido:', data.hash);
+                } else if (ultimoHashAvisos !== data.hash) {
+                    // Hash cambió, mostrar notificación y recargar la página
+                    console.log('Cambios detectados en la base de datos. Recargando...');
+                    console.log('Hash anterior:', ultimoHashAvisos);
+                    console.log('Hash nuevo:', data.hash);
+                    
+                    // Mostrar notificación visual de actualización
+                    mostrarNotificacionActualizacion();
+                    
+                    // Recargar después de un breve delay para que se vea la notificación
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
                 }
             }
-        } catch (e) {
-            // ignorar errores transitorios
-        }
-        if (Date.now() - startTime > 10 * 60 * 1000) {
-            location.reload();
+        } catch (error) {
+            console.warn('Error verificando cambios:', error);
+            // No recargar en caso de error de red, solo loguear
         }
     };
-    // Primera comprobación inmediata
-    checkHash();
-    // Intervalo periódico
-    hashPollInterval = setInterval(checkHash, 5000);
-    // Al volver a la pestaña, comprobar de nuevo
+    
+    // Verificar cambios inmediatamente
+    verificarCambios();
+    
+    // Configurar verificación cada 3 segundos (más frecuente para detectar cambios rápidamente)
+    hashPollInterval = setInterval(verificarCambios, 3000);
+    
+    // Verificar cambios cuando la pestaña vuelve a estar activa
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-            checkHash();
+            console.log('Pestaña activa, verificando cambios...');
+            verificarCambios();
         }
+    });
+    
+    // Verificar cambios cuando la ventana recupera el foco
+    window.addEventListener('focus', () => {
+        console.log('Ventana con foco, verificando cambios...');
+        verificarCambios();
     });
 }
 
@@ -378,7 +507,12 @@ function obtenerAvisosInicialesDesdeDOM(listaAvisosApi) {
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM cargado, iniciando actualización de fecha y hora...');
+    
+    // Actualizar fecha y hora inmediatamente
     actualizarHoraFecha();
+    
+    // Configurar actualización cada segundo
     setInterval(actualizarHoraFecha, 1000);
     
     // Actualizar clima inmediatamente y luego cada 10 minutos
@@ -388,6 +522,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Obtener el ID del aviso principal inicial
     obtenerIdAvisoPrincipalInicial();
     
+    // Iniciar el sistema de polling de cambios inmediatamente
+    iniciarPollingCambios();
+    
     // Cargar avisos después de un breve delay para permitir que la página cargue
     setTimeout(() => {
         cargarAvisos();
@@ -395,3 +532,36 @@ document.addEventListener('DOMContentLoaded', function() {
         // en la función iniciarRotacionAvisos(), no necesita intervalo separado
     }, 2000);
 });
+
+// También actualizar cuando la ventana se carga completamente
+window.addEventListener('load', function() {
+    console.log('Ventana cargada completamente, actualizando fecha y hora...');
+    actualizarHoraFecha();
+});
+
+// Función de prueba para verificar elementos
+function verificarElementos() {
+    console.log('=== VERIFICACIÓN DE ELEMENTOS ===');
+    const horaElement = document.getElementById('hora-actual');
+    const fechaElement = document.getElementById('fecha-actual');
+    
+    console.log('Elemento hora-actual:', horaElement);
+    console.log('Elemento fecha-actual:', fechaElement);
+    
+    if (horaElement) {
+        console.log('Contenido hora-actual:', horaElement.textContent);
+        console.log('HTML hora-actual:', horaElement.innerHTML);
+    }
+    
+    if (fechaElement) {
+        console.log('Contenido fecha-actual:', fechaElement.textContent);
+    }
+    
+    // Forzar actualización
+    actualizarHoraFecha();
+    
+    console.log('=== FIN VERIFICACIÓN ===');
+}
+
+// Ejecutar verificación después de 3 segundos
+setTimeout(verificarElementos, 3000);

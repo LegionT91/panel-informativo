@@ -14,7 +14,7 @@
 <body>
 	<div class="header">
 		<div class="logo">
-			<img class="logo-img" src="https://complejoprincipedegales.cl/wp-content/uploads/2023/07/Logo-sin-fondo-3-e1729003593989.png" alt="Logo Colegio" />
+			<img class="logo-img" src="{{ url_for('static', filename='logo.png') }}" alt="Logo Colegio" />
 			</div>
 			<div class="title">PANEL DE NOTICIAS</div>
 			<div style="display: flex; align-items: center; gap: 12px;">
@@ -51,7 +51,7 @@
 		{% if avisos %}
 			{% for aviso in avisos %}
 			<div class="news-card" id="aviso-{{ aviso.id }}">
-				<img class="news-img" src="{{ aviso.image_url if aviso.image_url else url_for('static', filename='logo.png') }}" alt="{{ aviso.title }}" />
+				<img class="news-img" src="{{ url_for('static', filename=aviso.image_url) if aviso.image_url else url_for('static', filename='logo.png') }}" alt="{{ aviso.title }}" />
 				<button class="close-btn" title="Eliminar noticia" data-aviso-id="{{ aviso.id }}">&times;</button>
 				<button class="edit-btn" title="Editar noticia" data-aviso-id="{{ aviso.id }}" style="position:absolute;right:56px;top:8px;"> 
 					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">

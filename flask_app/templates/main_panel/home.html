@@ -35,6 +35,31 @@
     <div class="main-content">
         <div class="main-card" style="background-image:url('{{ main_card.imagen_url }}');">
             <div class="main-card-overlay">
+                {% if main_card.id == 'empty_database' %}
+                <div class="main-card-text empty-state" data-aviso-id="{{ main_card.id or '' }}">
+                    <i class="bi bi-inbox empty-icon"></i>
+                    <div class="empty-message">{{ main_card.titulo|safe }}</div>
+                    <div class="empty-subtitle">Contacta al administrador para agregar noticias</div>
+                </div>
+                {% elif main_card.id and main_card.id.startswith('error_') %}
+                <div class="main-card-text error-state" data-aviso-id="{{ main_card.id or '' }}">
+                    <i class="bi bi-exclamation-triangle error-icon"></i>
+                    <div class="error-message">{{ main_card.titulo|safe }}</div>
+                    <div class="error-subtitle">
+                        {% if error_type == 'database_connection' %}
+                            Verifica que el servidor de base de datos esté funcionando
+                        {% elif error_type == 'database_auth' %}
+                            Revisa las credenciales de la base de datos
+                        {% elif error_type == 'database_not_found' %}
+                            La base de datos no existe o no está configurada
+                        {% elif error_type == 'table_not_found' %}
+                            La tabla de noticias no existe en la base de datos
+                        {% else %}
+                            Error técnico - contacta al administrador
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
                 <div class="main-card-text" data-aviso-id="{{ main_card.id or '' }}">
                     {{ main_card.titulo|safe }}
                 </div>
@@ -42,6 +67,7 @@
                 <div class="main-card-badge" style="position:absolute;bottom:16px;right:16px;background:rgba(0,0,0,0.65);color:#fff;padding:12px 18px;border-radius:10px;font-weight:800;font-size:32px;line-height:1.1;letter-spacing:0.2px;box-shadow:0 4px 12px rgba(0,0,0,0.25);">
                     {{ main_card.etiqueta_fecha }}
                 </div>
+                {% endif %}
                 {% endif %}
             </div>
         </div>

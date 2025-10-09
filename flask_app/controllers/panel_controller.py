@@ -1,42 +1,46 @@
+# -*- coding: utf-8 -*-
 """
-Controlador principal del panel informativo
+Controlador principal del panel informativo.
+
+Este archivo expone tres funciones públicas que el paquete app importa:
+- require_login_for_panel(app): middleware que protege rutas del panel
+- handle_needs_login(app): registra la ruta /login
+- register_routes(app): registra todas las rutas principales (home, APIs, admin)
+
+También centraliza la construcción de URLs públicas para imágenes mediante
+la función build_image_url() para evitar prefijos duplicados como
+"/static/static/uploads/...".
 """
-from flask import render_template, request, redirect, url_for, flash, jsonify, session
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime
-import os
 import hashlib
+import os
 
-# Usar el helper mysqlconnection.py (pymysql)
-from flask_app.config.mysqlconnection import connectToMySQL
+from flask import (
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    jsonify,
+    session,
+    current_app,
+)
+from flask_login import UserMixin, login_user, login_required, logout_user, current_user
 
-# Password hashing
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-# Importar función del clima
+from flask_app.config.mysqlconnection import connectToMySQL
 from flask_app.clima import obtener_clima_nueva_imperial
 
-# ============================================================================
-# CONFIGURACIÓN DE LA APLICACIÓN
-# ============================================================================
-
-# Carpeta para subir imágenes (relativa a la carpeta raíz de la app)
+# Config
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'static/uploads')
-
-# Extensiones permitidas (opcional, se puede ampliar)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-
-# Clave maestra requerida para crear usuarios desde el formulario de registro.
-# Se puede sobreescribir con la variable de entorno MASTER_KEY si se desea.
 MASTER_KEY = os.environ.get('MASTER_KEY', 'complejoprincipedegalescuenta25')
 
-# Lista temporal para almacenar los avisos (en producción usar una base de datos)
+# Memoria local simple (no persistente) usada por algunas vistas
 avisos = []
 
-# ============================================================================
-# MODELOS Y UTILIDADES
-# ============================================================================
 
 class User(UserMixin):
     def __init__(self, username):
@@ -52,7 +56,7 @@ def allowed_file(filename):
 
 
 def fmt_mysql(dt_str):
-    """Formatea una fecha ISO para MySQL"""
+    """Normaliza una fecha ISO para MySQL (añade segundos si faltan)."""
     if not dt_str:
         return None
     s = dt_str.replace('T', ' ')
@@ -63,7 +67,6 @@ def fmt_mysql(dt_str):
 
 
 def fmt_field(dt):
-    """Formatea un campo de fecha para respuesta JSON"""
     if not dt:
         return None
     try:
@@ -73,88 +76,81 @@ def fmt_field(dt):
 
 
 def fmt_field_display(dt):
-    """Formatea un campo de fecha para mostrar (DD/MM/YYYY)"""
     if not dt:
-        return ""
+        return ''
     if hasattr(dt, 'strftime'):
         return dt.strftime('%d/%m/%Y')
     return str(dt)
 
 
 def humanize_main_date(start_dt):
-    """Devuelve texto humano para la tarjeta principal según proximidad.
-    - Hoy / Mañana
-    - En X días (<= 7 días)
-    - Si > 7 días o pasado, fecha dd/mm/YYYY
-    """
     if not start_dt:
-        return ""
+        return ''
     try:
         if isinstance(start_dt, str):
-            # Normalizar 'YYYY-MM-DDTHH:MM' o 'YYYY-MM-DD HH:MM:SS'
             start_dt = datetime.fromisoformat(start_dt.replace('T', ' '))
         today = datetime.now().date()
         d = start_dt.date()
         delta_days = (d - today).days
-
         if delta_days == 0:
-            return "Hoy"
+            return 'Hoy'
         if delta_days == 1:
-            return "Mañana"
+            return 'Mañana'
         if 1 < delta_days <= 7:
-            return f"En {delta_days} días"
-        # Para pasado o más de una semana, mostrar fecha
+            return f'En {delta_days} días'
         return d.strftime('%d/%m/%Y')
     except Exception:
         return fmt_field_display(start_dt)
 
 
-# ============================================================================
-# MIDDLEWARE Y HANDLERS
-# ============================================================================
+def build_image_url(image_field):
+    """Construye la URL pública de una imagen almacenada.
+
+    Reglas:
+    - Si es una URL absoluta (http/https), devolverla tal cual.
+    - Si comienza con '/', devolverla tal cual (ya es ruta pública).
+    - Si comienza con 'static/', devolver '/'+campo (p.ej. 'static/uploads/x' -> '/static/uploads/x').
+    - En otro caso, asumir que es el nombre de archivo en 'static/' y devolver '/static/<value>'.
+    """
+    if not image_field:
+        return ''
+    if isinstance(image_field, str) and (image_field.startswith('http://') or image_field.startswith('https://')):
+        return image_field
+    if image_field.startswith('/'):
+        return image_field
+    if image_field.startswith('static/'):
+        return '/' + image_field
+    return '/' + os.path.join('static', image_field).replace('\\', '/')
+
 
 def require_login_for_panel(app):
-    """Proteger cualquier ruta que comience con /panel excepto las excepciones públicas"""
     @app.before_request
-    def before_request():
+    def _before_request():
         try:
             path = request.path
         except Exception:
             return None
-
-        # Rutas que dejaremos públicas (por ejemplo, para el front público)
-        public_panel_paths = ['/panel/avisos']
-
-        # Si la ruta comienza con /panel y no está en la lista pública, forzar login
+        # Rutas públicas del panel
+        public_panel_paths = ['/panel/avisos', '/api/clima']
         if path.startswith('/panel') and path not in public_panel_paths:
-            # Si el usuario no está autenticado, redirigir al login
             if not current_user.is_authenticated:
                 return redirect(url_for('login', next=request.url))
-            # Evitar bucles al redirigir si ya estamos en la página de login
-            if path == url_for('login'):
-                return None
 
 
 def handle_needs_login(app):
-    """Cuando un usuario no autorizado intenta acceder a una ruta protegida,
-    redirigimos al login y preservamos la ruta solicitada en el parámetro "next"."""
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        """Página de inicio de sesión"""
         next_page = None
         if request.method == 'GET':
             next_page = request.args.get('next')
-
         if request.method == 'POST':
             next_page = request.form.get('next') or request.args.get('next')
             username = request.form.get('username')
             password = request.form.get('password')
-
             try:
                 db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
                 rows = db.query_db('SELECT * FROM usuarios WHERE username = %(username)s', {'username': username})
                 row = rows[0] if rows else None
-
                 if row and check_password_hash(row['password'], password):
                     user = User(row['username'])
                     login_user(user)
@@ -166,40 +162,26 @@ def handle_needs_login(app):
                     flash('Credenciales inválidas')
             except Exception as e:
                 flash(f'Error al conectar con la base de datos: {e}')
-
         return render_template('login_panel/login.html', next=next_page)
 
 
-# ============================================================================
-# RUTAS PÚBLICAS
-# ============================================================================
-
 def register_routes(app):
-    """Registra todas las rutas de la aplicación"""
-    
     @app.route('/')
     @app.route('/home')
     def home():
-        """Página principal que muestra noticias priorizadas por proximidad de fecha"""
+        error_message = None
+        error_type = None
         try:
             db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
-            
-            # Obtener todos los avisos para procesarlos por proximidad de fecha
             all_rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
-            
             if all_rows:
-                # Separar avisos con fecha y sin fecha
                 avisos_con_fecha = []
                 avisos_sin_fecha = []
-                
                 for r in all_rows:
                     if r.get('start_date'):
                         avisos_con_fecha.append(r)
                     else:
                         avisos_sin_fecha.append(r)
-                
-                # Ordenar por proximidad sin limitar por rango; priorizar próximos
-                from datetime import datetime, timedelta
                 now = datetime.now()
 
                 def calcular_proximidad(aviso):
@@ -208,63 +190,45 @@ def register_routes(app):
                         if fecha_inicio:
                             if isinstance(fecha_inicio, str):
                                 fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
-                            # Calcular diferencia absoluta en días
                             diff = abs((fecha_inicio - now).days)
-                            # Priorizar eventos futuros cercanos
-                            if fecha_inicio >= now:
-                                return diff
-                            else:
-                                # Eventos pasados tienen menor prioridad
-                                return diff + 1000
-                        return 9999  # Sin fecha, menor prioridad
-                    except:
+                            return diff if fecha_inicio >= now else diff + 1000
                         return 9999
-                # Ordenar todos los que tienen fecha por proximidad y tomar los 4 más próximos
+                    except Exception:
+                        return 9999
+
                 avisos_con_fecha.sort(key=calcular_proximidad)
                 avisos_ordenados = avisos_con_fecha[:4]
-                # Completar con sin fecha si faltan
                 if len(avisos_ordenados) < 4:
                     faltan = 4 - len(avisos_ordenados)
                     avisos_ordenados = avisos_ordenados + avisos_sin_fecha[:faltan]
-                
-                # Obtener el aviso más próximo para el recuadro principal
+
                 if avisos_ordenados:
                     r = avisos_ordenados[0]
-                    imagen_main = r.get('image_url') if r.get('image_url') else 'static/main_panel/img/logo.png'
+                    imagen_main = build_image_url(r.get('image_url')) if r.get('image_url') else '/static/main_panel/img/logo.png'
                     main_card = {
                         'titulo': r.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
                         'imagen_url': imagen_main,
-                        'id': r.get('idnotice'),  # Agregar ID para evitar duplicados
+                        'id': str(r.get('idnotice')),
                         'etiqueta_fecha': humanize_main_date(r.get('start_date')),
                     }
-                    
-                    # Obtener las siguientes noticias para las tarjetas laterales (evitando duplicados)
                     eventos = []
                     main_card_id = r.get('idnotice')
-                    
-                    # Buscar avisos únicos para las tarjetas laterales
-                    for r in avisos_ordenados[1:]:  # Empezar desde el segundo aviso
-                        if len(eventos) >= 3:  # Solo necesitamos 3 tarjetas laterales
+                    for r in avisos_ordenados[1:]:
+                        if len(eventos) >= 3:
                             break
-                            
-                        # Verificar que no sea el mismo que el principal
                         if r.get('idnotice') != main_card_id:
                             eventos.append({
                                 'titulo': r.get('name_notice', ''),
                                 'fecha_inicio': fmt_field_display(r.get('start_date')),
                                 'fecha_fin': fmt_field_display(r.get('end_date')),
-                                'imagen_url': (r.get('image_url') if r.get('image_url') else 'static/main_panel/img/logo.png'),
-                                'id': r.get('idnotice'),  # Agregar ID para JavaScript
+                                'imagen_url': (build_image_url(r.get('image_url')) if r.get('image_url') else '/static/main_panel/img/logo.png'),
+                                'id': str(r.get('idnotice')),
                             })
-                    
-                    # No agregar placeholders cuando sí hay avisos
                 else:
-                    # Fallback si no hay avisos
                     main_card = {
                         'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
                         'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
                     }
-                    # Mostrar un solo placeholder cuando no hay ningún aviso
                     eventos = [{
                         'titulo': 'Próximamente más noticias',
                         'fecha_inicio': '',
@@ -273,35 +237,32 @@ def register_routes(app):
                         'id': 'placeholder_0',
                     }]
             else:
-                # Fallback si no hay avisos en la base de datos
                 main_card = {
-                    'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
-                    'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
+                    'titulo': 'No hay noticias disponibles<br>en la base de datos',
+                    'imagen_url': '/static/main_panel/img/logo.png',
+                    'etiqueta_fecha': '',
+                    'id': 'empty_database'
                 }
                 eventos = []
-                
         except Exception as e:
-            # Fallback en caso de error con la base de datos
-            print(f"Error en home(): {e}")  # Para debug
+            error_message = str(e)
+            error_type = 'database_connection'
+            current_app.logger.exception('Error en home')
             main_card = {
-                'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
-                'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
+                'titulo': f'Error de conexión<br>{error_message}',
+                'imagen_url': '/static/main_panel/img/logo.png',
+                'etiqueta_fecha': '',
+                'id': f'error_{error_type}'
             }
             eventos = []
-        
-        # Obtener datos del clima
+
         try:
             clima = obtener_clima_nueva_imperial()
         except Exception as e:
-            print(f"Error obteniendo clima: {e}")
-            # Valores por defecto en caso de error
-            clima = {
-                "temperatura_actual": 15,
-                "icono_bootstrap": "bi-sun",
-                "descripcion": "Soleado"
-            }
-            
-        return render_template('main_panel/home.html', eventos=eventos, main_card=main_card, clima=clima)
+            current_app.logger.exception('Error obteniendo clima')
+            clima = {'temperatura_actual': 15, 'icono_bootstrap': 'bi-sun', 'descripcion': 'Soleado'}
+
+        return render_template('main_panel/home.html', eventos=eventos, main_card=main_card, clima=clima, error_message=error_message, error_type=error_type)
 
 
     @app.route('/api/clima', methods=['GET'])
@@ -311,12 +272,9 @@ def register_routes(app):
             clima = obtener_clima_nueva_imperial()
             return jsonify(clima)
         except Exception as e:
-            return jsonify({
-                "error": str(e),
-                "temperatura_actual": 15,
-                "icono_bootstrap": "bi-sun",
-                "descripcion": "Soleado"
-            }), 500
+            current_app.logger.exception('Error en get_clima')
+            return jsonify({'error': str(e), 'temperatura_actual': 15, 'icono_bootstrap': 'bi-sun', 'descripcion': 'Soleado'}), 500
+
 
     @app.route('/panel/avisos', methods=['GET'])
     def get_avisos():
@@ -325,30 +283,27 @@ def register_routes(app):
             db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
             rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
             
-            # Mapear todos los avisos (estructura que usa el cliente)
             mapped_all = []
             avisos_con_fecha = []
             avisos_sin_fecha = []
 
             for r in rows:
+                image_field = r.get('image_url')
                 aviso_data = {
-                    'id': r.get('idnotice'),
+                    'id': str(r.get('idnotice')),
                     'title': r.get('name_notice'),
                     'description': r.get('description') if 'description' in r else '',
-                    'image_url': r.get('image_url') if 'image_url' in r else '',
+                    'image_url': build_image_url(image_field) if image_field else '',
                     'fecha_inicio': fmt_field(r.get('start_date')),
                     'fecha_fin': fmt_field(r.get('end_date')),
                 }
                 mapped_all.append(aviso_data)
 
-                # Mantener la separación por fecha para la lógica actual
                 if r.get('start_date'):
                     avisos_con_fecha.append((aviso_data, r.get('start_date')))
                 else:
                     avisos_sin_fecha.append(aviso_data)
 
-            # Ordenar por proximidad SIN límite de rango, priorizando próximos
-            from datetime import datetime
             now = datetime.now()
 
             def calcular_proximidad_api(item):
@@ -358,7 +313,7 @@ def register_routes(app):
                         fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
                     diff = abs((fecha_inicio - now).days)
                     return diff if fecha_inicio >= now else diff + 1000
-                except:
+                except Exception:
                     return 9999
 
             avisos_con_fecha.sort(key=calcular_proximidad_api)
@@ -366,6 +321,7 @@ def register_routes(app):
 
             return jsonify(mapped)
         except Exception as e:
+            current_app.logger.exception('Error en get_avisos')
             return jsonify({'error': str(e)}), 500
 
 
@@ -386,12 +342,9 @@ def register_routes(app):
             digest = hashlib.md5(payload.encode('utf-8')).hexdigest()
             return jsonify({'hash': digest})
         except Exception as e:
+            current_app.logger.exception('Error en get_avisos_hash')
             return jsonify({'error': str(e)}), 500
 
-
-    # ============================================================================
-    # RUTAS DE AUTENTICACIÓN
-    # ============================================================================
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
@@ -426,6 +379,7 @@ def register_routes(app):
                 flash('Registro exitoso. Ya puedes ingresar.')
                 return redirect(url_for('login'))
             except Exception as e:
+                current_app.logger.exception('Error en registro')
                 flash(f'Error al conectar con la base de datos: {e}')
                 return redirect(url_for('register'))
 
@@ -441,10 +395,6 @@ def register_routes(app):
         return redirect(url_for('home'))
 
 
-    # ============================================================================
-    # RUTAS DEL PANEL DE ADMINISTRACIÓN
-    # ============================================================================
-
     @app.route('/panel')
     @login_required
     def panel():
@@ -458,15 +408,16 @@ def register_routes(app):
             mapped = []
             for r in rows:
                 mapped.append({
-                    'id': r.get('idnotice'),
+                    'id': str(r.get('idnotice')),
                     'title': r.get('name_notice'),
                     'description': r.get('description') if 'description' in r else '',
-                    'image_url': r.get('image_url') if 'image_url' in r else '',
+                    'image_url': build_image_url(r.get('image_url')) if r.get('image_url') else '',
                     'fecha_inicio': fmt_field(r.get('start_date')),
                     'fecha_fin': fmt_field(r.get('end_date')),
                 })
             return render_template('admin_panel/panel.html', avisos=mapped)
         except Exception as e:
+            current_app.logger.exception('Error cargando panel')
             flash(f'Error cargando avisos desde la base de datos: {e}')
             return render_template('admin_panel/panel.html', avisos=avisos)
 
@@ -479,10 +430,6 @@ def register_routes(app):
             return redirect(url_for('login', next=request.path))
         return render_template('admin_panel/panel.html', avisos=avisos)
 
-
-    # ============================================================================
-    # RUTAS API - GESTIÓN DE AVISOS
-    # ============================================================================
 
     @app.route('/panel/add', methods=['POST'])
     @login_required
@@ -526,7 +473,6 @@ def register_routes(app):
 
         data = request.get_json()
         
-        # Validar fechas si vienen en la petición
         if 'fecha_inicio' in data or 'fecha_fin' in data:
             try:
                 nueva_inicio = datetime.fromisoformat(data.get('fecha_inicio')) if data.get('fecha_inicio') else None
@@ -542,7 +488,6 @@ def register_routes(app):
             if not rows:
                 return jsonify({"error": "Aviso no encontrado"}), 404
             
-            # Construir consulta UPDATE dinámica según los campos que vienen
             set_clauses = []
             params = {'id': aviso_id}
 
@@ -567,18 +512,16 @@ def register_routes(app):
                 try:
                     db.query_db(sql, params)
                 except Exception:
-                    # Fallback: intentar actualizar solo columnas básicas si alguna columna no existe
                     fallback_clauses = [c for c in set_clauses if not c.startswith('description') and not c.startswith('image_url')]
                     if fallback_clauses:
                         sql2 = 'UPDATE notice SET ' + ', '.join(fallback_clauses) + ' WHERE idnotice = %(id)s'
                         db.query_db(sql2, params)
 
-            # Leer fila actualizada
             row = db.query_db('SELECT * FROM notice WHERE idnotice = %(id)s', {'id': aviso_id})
             r = row[0] if row else rows[0]
 
             mapped = {
-                'id': r.get('idnotice'),
+                'id': str(r.get('idnotice')),
                 'title': r.get('name_notice'),
                 'description': r.get('description') if 'description' in r else '',
                 'image_url': r.get('image_url') if 'image_url' in r else '',
@@ -586,7 +529,6 @@ def register_routes(app):
                 'fecha_fin': fmt_field(r.get('end_date')),
             }
 
-            # Actualizar memoria local si existe
             for aviso in avisos:
                 if aviso.get('id') == mapped['id']:
                     aviso.update(mapped)
@@ -594,6 +536,7 @@ def register_routes(app):
 
             return jsonify(mapped)
         except Exception as e:
+            current_app.logger.exception('Error en edit_aviso')
             return jsonify({'error': str(e)}), 500
 
 
@@ -610,10 +553,10 @@ def register_routes(app):
             row = rows[0]
             img_field = row.get('image_url') if 'image_url' in row else None
             
-            # Intentar eliminar la imagen física
             if img_field:
                 filename = os.path.basename(img_field)
-                upload_folder = os.path.join(app.root_path, UPLOAD_FOLDER)
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                upload_folder = os.path.join(base_dir, UPLOAD_FOLDER)
                 file_path = os.path.join(upload_folder, filename)
                 try:
                     if os.path.exists(file_path):
@@ -621,12 +564,11 @@ def register_routes(app):
                 except Exception:
                     pass
             
-            # Eliminar de la base de datos
             db.query_db('DELETE FROM notice WHERE idnotice = %(id)s', {'id': aviso_id})
         except Exception as e:
+            current_app.logger.exception('Error en delete_aviso')
             return jsonify({'error': f'Error al eliminar en la base de datos: {e}'}), 500
 
-        # Eliminar de la memoria local
         aviso_index = next((index for (index, aviso) in enumerate(avisos) if aviso['id'] == aviso_id), None)
         aviso_eliminado = None
         if aviso_index is not None:
@@ -634,10 +576,6 @@ def register_routes(app):
 
         return jsonify({'deleted': aviso_id, 'removed_from_memory': aviso_eliminado is not None})
 
-
-    # ============================================================================
-    # RUTAS DE SUBIDA DE ARCHIVOS
-    # ============================================================================
 
     @app.route('/panel/upload', methods=['POST'])
     @login_required
@@ -652,9 +590,8 @@ def register_routes(app):
         fecha_inicio = request.form.get('fecha_inicio')
         fecha_fin = request.form.get('fecha_fin')
 
-        # Log básico para diagnóstico
         try:
-            app.logger.info(f"upload_news called: title={title!r}, fecha_inicio={fecha_inicio!r}, fecha_fin={fecha_fin!r}, file_present={bool(file and getattr(file, 'filename', None))}")
+            current_app.logger.info(f"upload_news called: title={title!r}, fecha_inicio={fecha_inicio!r}, fecha_fin={fecha_fin!r}, file_present={bool(file and getattr(file, 'filename', None))}")
         except Exception:
             pass
 
@@ -662,7 +599,6 @@ def register_routes(app):
             flash('Debe completar título, fecha de inicio y fecha de fin')
             return redirect(url_for('panel'))
 
-        # Validar fechas
         try:
             inicio = datetime.fromisoformat(fecha_inicio)
             fin = datetime.fromisoformat(fecha_fin)
@@ -674,7 +610,7 @@ def register_routes(app):
             return redirect(url_for('panel'))
 
         filename = None
-        image_url = ''
+        image_url_db = ''
         
         if file and file.filename:
             if not allowed_file(file.filename):
@@ -682,18 +618,19 @@ def register_routes(app):
                 return redirect(url_for('panel'))
             
             filename = secure_filename(file.filename)
-            upload_folder = os.path.join(app.root_path, UPLOAD_FOLDER)
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            upload_folder = os.path.join(base_dir, UPLOAD_FOLDER)
             os.makedirs(upload_folder, exist_ok=True)
             save_path = os.path.join(upload_folder, filename)
             
             try:
                 file.save(save_path)
             except Exception as e:
-                app.logger.exception('Error guardando archivo')
+                current_app.logger.exception('Error guardando archivo')
                 flash(f'Error guardando archivo: {e}')
                 return redirect(url_for('panel'))
             
-            image_url = url_for('static', filename=f'uploads/{filename}')
+            image_url_db = os.path.join('static', 'uploads', filename).replace('\\', '/')
 
         try:
             db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
@@ -703,7 +640,6 @@ def register_routes(app):
             
             try:
                 if filename:
-                    image_url_db = f'static/uploads/{filename}'
                     insert_result = db.query_db(
                         'INSERT INTO notice (name_notice, start_date, end_date, image_url) VALUES (%(name)s, %(start)s, %(end)s, %(img)s)',
                         {'name': title, 'start': start_sql, 'end': end_sql, 'img': image_url_db}
@@ -713,40 +649,20 @@ def register_routes(app):
                         'INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
                         {'name': title, 'start': start_sql, 'end': end_sql}
                     )
-                
-                try:
-                    app.logger.info(f'Insert result: {insert_result!r}')
-                except Exception:
-                    pass
-                    
             except Exception:
-                # Fallback por si la tabla no tiene columna image_url
                 insert_result = db.query_db(
                     'INSERT INTO notice (name_notice, start_date, end_date) VALUES (%(name)s, %(start)s, %(end)s)',
                     {'name': title, 'start': start_sql, 'end': end_sql}
                 )
-                try:
-                    app.logger.info(f'Fallback insert result: {insert_result!r}')
-                except Exception:
-                    pass
 
             row = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC LIMIT 1')
-            try:
-                app.logger.info(f'SELECT returned rows: {row!r}')
-            except Exception:
-                pass
-            
             inserted = row[0] if row else None
-            try:
-                app.logger.info(f'Inserted row (mapped): {inserted!r}')
-            except Exception:
-                pass
 
             nuevo_aviso = {
-                'id': inserted['idnotice'] if inserted else (len(avisos) + 1),
+                'id': str(inserted['idnotice']) if inserted else str(len(avisos) + 1),
                 'title': title,
                 'description': request.form.get('description', ''),
-                'image_url': f'static/uploads/{filename}' if filename else '',
+                'image_url': image_url_db if image_url_db else '',
                 'fecha_inicio': fecha_inicio,
                 'fecha_fin': fecha_fin,
                 'created_at': datetime.now().isoformat(),
@@ -756,11 +672,7 @@ def register_routes(app):
             return redirect(url_for('panel'))
             
         except Exception as e:
-            # Loguear excepción para diagnóstico y mostrar mensaje al usuario
-            try:
-                app.logger.exception(e)
-            except Exception:
-                pass
+            current_app.logger.exception('Error en upload_news')
             flash(f'Error al guardar en la base de datos: {e}')
             return redirect(url_for('panel'))
 
@@ -780,19 +692,19 @@ def register_routes(app):
             return jsonify({'error': 'Tipo de archivo no permitido. Usa png/jpg/jpeg/gif/webp'}), 400
 
         filename = secure_filename(file.filename)
-        upload_folder = os.path.join(app.root_path, UPLOAD_FOLDER)
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        upload_folder = os.path.join(base_dir, UPLOAD_FOLDER)
         os.makedirs(upload_folder, exist_ok=True)
         save_path = os.path.join(upload_folder, filename)
         
         try:
             file.save(save_path)
         except Exception as e:
-            app.logger.exception('Error guardando archivo al editar')
+            current_app.logger.exception('Error guardando archivo al editar')
             return jsonify({'error': str(e)}), 500
 
-        image_url_db = f'static/uploads/{filename}'
+        image_url_db = os.path.join('static', 'uploads', filename).replace('\\', '/')
 
-        # Opcionalmente actualizar otros campos que vengan en el form (title, fecha_inicio, fecha_fin)
         title = request.form.get('title')
         fecha_inicio = request.form.get('fecha_inicio')
         fecha_fin = request.form.get('fecha_fin')
@@ -800,7 +712,6 @@ def register_routes(app):
         try:
             db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
             
-            # Construir UPDATE dinámico
             set_clauses = ['image_url = %(img)s']
             params = {'img': image_url_db, 'id': aviso_id}
 
@@ -817,7 +728,6 @@ def register_routes(app):
             sql = 'UPDATE notice SET ' + ', '.join(set_clauses) + ' WHERE idnotice = %(id)s'
             db.query_db(sql, params)
 
-            # Actualizar memoria
             for aviso in avisos:
                 if aviso.get('id') == aviso_id:
                     aviso['image_url'] = image_url_db
@@ -831,5 +741,5 @@ def register_routes(app):
 
             return jsonify({'ok': True, 'image_url': image_url_db})
         except Exception as e:
-            app.logger.exception('Error actualizando imagen en BD')
+            current_app.logger.exception('Error actualizando imagen en BD')
             return jsonify({'error': str(e)}), 500
