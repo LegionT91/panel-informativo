@@ -1,0 +1,155 @@
+body {
+			margin: 0;
+			font-family: 'Segoe UI', Arial, sans-serif;
+			background: #fff;
+		}
+		.header {
+			background: #353e82;
+			color: #fff;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 24px 40px 24px 32px;
+		}
+		.logo {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+		}
+		.logo-img {
+			width: 70px;
+			margin-bottom: 2px;
+		}
+		.logo-text {
+			font-size: 14px;
+			font-weight: 400;
+			margin-top: 2px;
+		}
+		.title {
+			font-size: 48px;
+			font-weight: bold;
+			letter-spacing: 2px;
+			text-align: center;
+			flex: 1;
+		}
+		.add-btn {
+			font-size: 56px;
+			font-weight: 300;
+			cursor: pointer;
+			user-select: none;
+		}
+		.news-container {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+			gap: 32px;
+			margin: 48px;
+			padding-right: 48px;
+			width: calc(100% - 96px);
+		}
+		.news-card {
+			position: relative;
+			width: 100%;
+			aspect-ratio: 6/5;
+			border-radius: 20px;
+			overflow: hidden;
+			box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+			background: #222;
+			display: flex;
+			align-items: flex-end;
+			transition: all 0.3s ease;
+		}
+		
+		.news-card:hover {
+			transform: translateY(-5px);
+			box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+		}
+		
+		.news-card:hover .news-img {
+			filter: brightness(0.8);
+			transform: scale(1.05);
+		}
+		.news-img {
+			position: absolute;
+			top: 0; left: 0; right: 0; bottom: 0;
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			filter: brightness(0.7);
+			transition: all 0.3s ease;
+		}
+		.news-text {
+			position: relative;
+			color: #fff;
+			font-size: 18px;
+			font-weight: 500;
+			padding: 0 16px 18px 16px;
+			z-index: 2;
+			text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+		}
+		.close-btn {
+			position: absolute;
+			top: 12px;
+			right: 16px;
+			font-size: 30px;
+			color: #fff;
+			background: rgba(0,0,0,0.25);
+			border: none;
+			border-radius: 50%;
+			width: 38px;
+			height: 38px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			z-index: 3;
+			transition: background 0.2s;
+		}
+		#boton {
+			font-size: 60px;
+			width: 50px;
+			height: 50px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			user-select: none;
+			background-color: #353e82;
+			color: white;
+			border: none;
+			position: relative;
+			top: -5px;
+
+		}
+		.close-btn:hover {
+			background: rgba(53,62,130,0.8);
+		}
+
+		/* Botón de editar: mismo look & hover que .close-btn */
+		.edit-btn {
+			font-size: 0; /* ocultar texto si lo hubiera */
+			color: #fff;
+			background: rgba(0,0,0,0.25);
+			border: none;
+			border-radius: 50%;
+			width: 36px;
+			height: 36px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			z-index: 3;
+			transition: background 0.2s;
+		}
+
+		.edit-btn:hover {
+			background: rgba(53,62,130,0.8);
+		}
+		@media (max-width: 900px) {
+			.news-container {
+				flex-direction: column;
+				gap: 24px;
+				margin: 32px auto;
+				align-items: center;
+			}
+		}

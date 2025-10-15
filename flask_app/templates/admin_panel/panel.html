@@ -1,0 +1,608 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Panel de Noticias</title>
+	<link rel="stylesheet" href="{{ url_for('static', filename='admin_panel/style.css') }}">
+	
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+
+</head>
+<body>
+	<div class="header">
+		<div class="logo">
+			<img class="logo-img" src="{{ url_for('static', filename='logo.png') }}" alt="Logo Colegio" />
+			</div>
+			<div class="title">PANEL DE NOTICIAS</div>
+			<div style="display: flex; align-items: center; gap: 12px;">
+				<!-- Botón para abrir modal de añadir noticia -->
+				<button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#exampleModal" style="display:flex; align-items:center; gap:8px; border:none; background:transparent; padding:0;">
+					<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+						<line x1="12" y1="5" x2="12" y2="19"></line>
+						<line x1="5" y1="12" x2="19" y2="12"></line>
+					</svg>
+					<span class="visually-hidden">Añadir noticia</span>
+				</button>
+				<!-- Botón de cerrar sesión -->
+				<a href="/logout" class="btn btn-outline-light" style="display:flex; align-items:center; gap:8px;">
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+						<polyline points="16 17 21 12 16 7"></polyline>
+						<line x1="21" y1="12" x2="9" y2="12"></line>
+					</svg>
+					Cerrar Sesión
+				</a>
+			</div>
+			</div>
+	<div class="news-container">
+		<!-- Mostrar mensajes flash del servidor -->
+		{% with messages = get_flashed_messages() %}
+		  {% if messages %}
+		    <div class="container mt-3">
+		      {% for msg in messages %}
+		        <div class="alert alert-info">{{ msg }}</div>
+		      {% endfor %}
+		    </div>
+		  {% endif %}
+		{% endwith %}
+		{% if avisos %}
+			{% for aviso in avisos %}
+			<div class="news-card" id="aviso-{{ aviso.id }}">
+				<img class="news-img" src="{{ aviso.image_url if aviso.image_url else url_for('static', filename='logo.png') }}" alt="{{ aviso.title }}" />
+				<button class="close-btn" title="Eliminar noticia" data-aviso-id="{{ aviso.id }}">&times;</button>
+				<button class="edit-btn" title="Editar noticia" data-aviso-id="{{ aviso.id }}" style="position:absolute;right:56px;top:8px;"> 
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">
+						<path d="M12 20h9"></path>
+						<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+					</svg>
+					<span class="visually-hidden">Editar</span>
+				</button>
+				<div class="news-text">{{ aviso.title }}</div>
+			</div>
+			{% endfor %}
+		{% else %}
+			<div class="alert alert-info">No hay noticias registradas en la base de datos.</div>
+		{% endif %}
+	</div>
+
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+		<h1 class="modal-title fs-5 text-center w-100" id="exampleModalLabel" style="text-align:center;">Añadir Noticia</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+	  <div class="modal-body">
+				<form id="addNewsForm" method="POST" action="/panel/upload" enctype="multipart/form-data">
+					<div class="mb-3">
+						<label for="newsTitle" class="form-label" style="font-size:1.2em; display:block; text-align:center;">Título noticia:</label>
+						<textarea class="form-control" id="newsTitle" name="title" rows="2" placeholder="Escribe el título de la noticia" required></textarea>
+					</div>
+					<div class="row mb-3">
+						<div class="col">
+							<label for="startDate" class="form-label">Fecha inicio:</label>
+							<input type="datetime-local" class="form-control" id="startDate" name="fecha_inicio" required>
+						</div>
+						<div class="col">
+							<label for="endDate" class="form-label">Fecha finalización:</label>
+							<input type="datetime-local" class="form-control" id="endDate" name="fecha_fin" required>
+						</div>
+					</div>
+					<div class="mb-3 text-center">
+						<label for="newsImage" class="form-label" style="width:100%;font-size:1.3em;display:block;">Haga clic para subir una imagen</label>
+						<input type="file" class="form-control" id="newsImage" name="photo" accept="image/*" style="display:none;">
+						<div id="imagePreview" style="border:2px solid #ccc;border-radius:10px;padding:16px;cursor:pointer;display:inline-block;width:180px;height:140px;background:#f3f3f3;" onclick="document.getElementById('newsImage').click()">
+							<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="none" stroke="#888" stroke-width="2" viewBox="0 0 24 24" style="margin-top:20px;">
+								<rect x="3" y="3" width="18" height="18" rx="4"/>
+								<circle cx="8" cy="8" r="2.5"/>
+								<path d="M3 17l4-4a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 0 2.8 0l3.2-3.2"/>
+							</svg>
+							<div style="color:#888;font-size:1em;margin-top:8px;">Imagen</div>
+						</div>
+					</div>
+				</form>
+      </div>
+      <div class="modal-footer">
+	<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+	<button type="submit" class="btn btn-primary" form="addNewsForm">Añadir noticia</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h1 class="modal-title fs-5" id="editModalLabel">Editar Noticia</h1>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+						<form id="editNewsForm">
+							<input type="hidden" id="editId" name="id">
+							<div class="mb-3">
+								<label for="editTitle" class="form-label">Título</label>
+								<textarea class="form-control" id="editTitle" name="title" rows="2" required></textarea>
+							</div>
+							<div class="mb-3 text-center">
+								<label for="editImageFile" class="form-label">Subir nueva imagen</label>
+								<input type="file" class="form-control" id="editImageFile" name="photo" accept="image/*">
+								<div id="editImagePreview" style="margin-top:8px;"></div>
+								<div class="form-text">Si seleccionas un archivo, se subirá y reemplazará la imagen del aviso.</div>
+							</div>
+					<div class="row mb-3">
+						<div class="col">
+							<label for="editStart" class="form-label">Fecha inicio</label>
+							<input type="datetime-local" class="form-control" id="editStart" name="fecha_inicio">
+						</div>
+						<div class="col">
+							<label for="editEnd" class="form-label">Fecha fin</label>
+							<input type="datetime-local" class="form-control" id="editEnd" name="fecha_fin">
+						</div>
+					</div>
+				</form>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+				<button type="button" class="btn btn-primary" id="saveEditBtn">Guardar cambios</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+// Vista previa de imagen
+document.addEventListener('DOMContentLoaded', function() {
+	const imageInput = document.getElementById('newsImage');
+	const imagePreview = document.getElementById('imagePreview');
+	imageInput.addEventListener('change', function(e) {
+		if (e.target.files && e.target.files[0]) {
+			const reader = new FileReader();
+			reader.onload = function(ev) {
+				imagePreview.innerHTML = `<img src='${ev.target.result}' style='max-width:100%;max-height:100px;border-radius:8px;' />`;
+			};
+			reader.readAsDataURL(e.target.files[0]);
+		}
+	});
+
+	// Enviar formulario: al enviar, el formulario normal POST multipart será enviado al servidor
+	document.getElementById('addNewsForm').addEventListener('submit', function(e) {
+		// Mostrar feedback mínimo y dejar que el navegador envíe el form
+		const submitBtn = document.querySelector('#exampleModal .modal-footer button[type="submit"]');
+		submitBtn.disabled = true;
+		submitBtn.innerText = 'Subiendo...';
+	});
+});
+</script>
+<script>
+// Función para eliminar aviso vía API
+async function deleteAviso(id) {
+	if (!confirm('¿Eliminar esta noticia?')) return;
+	try {
+		const res = await fetch(`/panel/delete/${id}`, { method: 'DELETE' });
+		const data = await res.json();
+		if (res.ok) {
+			// Refrescar la lista desde la base de datos
+			await fetchAndRenderAvisos();
+			// Opcional: mostrar confirmación
+			alert('Noticia eliminada');
+		} else {
+			alert('Error al eliminar: ' + (data.error || JSON.stringify(data)));
+		}
+	} catch (err) {
+		alert('Error de red: ' + err);
+	}
+}
+</script>
+<script>
+// Volcar avisos desde la API y renderizar el HTML en el cliente
+async function fetchAndRenderAvisos() {
+	try {
+		// Si ya hay una actualización en curso, esperar
+		if (isUpdating) {
+			console.log('Actualización en curso, esperando...');
+			return;
+		}
+		
+		isUpdating = true;
+		const res = await fetch('/panel/avisos?all=1');
+		if (!res.ok) {
+			console.error('Error al obtener avisos:', res.status, res.statusText);
+			const container = document.querySelector('.news-container');
+			if (container) {
+				container.innerHTML = '<div class="alert alert-danger">Error al cargar las noticias. Por favor, recarga la página.</div>';
+			}
+			return;
+		}
+
+		let avisos = await res.json();
+		console.log('Avisos recibidos del servidor:', avisos); // Log para depuración
+
+		const container = document.querySelector('.news-container');
+		if (!container) {
+			console.error('Contenedor de noticias no encontrado');
+			return;
+		}
+
+		if (!Array.isArray(avisos)) {
+			console.error('Los avisos recibidos no son un array:', avisos);
+			container.innerHTML = '<div class="alert alert-danger">Error en el formato de datos recibidos.</div>';
+			return;
+		}
+
+		if (avisos.length === 0) {
+			container.innerHTML = '<div class="alert alert-info">No hay noticias registradas en la base de datos.</div>';
+			return;
+		}
+
+		// Ordenar por fecha_inicio descendente - parsing robusto para distintos formatos
+		const parseISOtoMs = (s) => {
+			if (!s) return 0;
+			// Si es ya un número
+			if (typeof s === 'number') return s;
+			// Algunos formatos pueden venir como 'YYYY-MM-DD HH:MM:SS' o 'YYYY-MM-DDTHH:MM' (sin segundos)
+			let str = String(s).trim();
+			try {
+				// Reemplazar espacio entre fecha y hora por 'T'
+				if (str.indexOf(' ') > 0 && str.indexOf('T') === -1) {
+					str = str.replace(' ', 'T');
+				}
+				// Si tiene formato 'YYYY-MM-DDTHH:MM' añadir segundos
+				const timePart = str.split('T')[1];
+				if (timePart && timePart.length === 5) {
+					str = str + ':00';
+				}
+				const ms = Date.parse(str);
+				if (!isNaN(ms)) return ms;
+				// Fallback: try direct Date parsing
+				return new Date(str).getTime() || 0;
+			} catch (e) {
+				console.warn('Error parseando fecha:', s, e);
+				return 0;
+			}
+		};
+
+		// Orden relativo: primero los avisos que ya comenzaron (más recientes primero),
+		// luego los futuros (los más cercanos primero), y al final los que no tienen fecha.
+		const now = Date.now();
+		const parsed = avisos.map(a => {
+			const ms = parseISOtoMs(a.fecha_inicio);
+			console.log(`Aviso ID ${a.id}: fecha_inicio = ${a.fecha_inicio}, ms = ${ms}`); // Log para depuración
+			return { ...a, _ms: ms };
+		});
+
+		// Separar en tres grupos: actuales, futuros y sin fecha
+		const withValidDates = parsed.filter(p => p._ms > 0);
+		const noDates = parsed.filter(p => p._ms === 0);
+		
+		const started = withValidDates.filter(p => p._ms <= now).sort((a, b) => b._ms - a._ms);
+		const future = withValidDates.filter(p => p._ms > now).sort((a, b) => a._ms - b._ms);
+		
+		// Concatenar todos los grupos
+		avisos = [...started, ...future, ...noDates];
+		
+		console.log('Avisos procesados:', {
+			total: avisos.length,
+			started: started.length,
+			future: future.length,
+			noDates: noDates.length
+		});
+		const logoUrl = '{{ url_for("static", filename="logo.png") }}';
+		container.innerHTML = avisos.map(aviso => {
+				const img = aviso.image_url && aviso.image_url !== '' ? aviso.image_url : logoUrl;
+				const escapedTitle = (aviso.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+				return `
+					<div class="news-card" id="aviso-${aviso.id}" style="position:relative;">
+						<img class="news-img" src="${img}" alt="${escapedTitle}" />
+						<button class="close-btn" title="Eliminar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:8px;top:8px;">&times;</button>
+						<button class="edit-btn" title="Editar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:56px;top:8px;">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">
+								<path d="M12 20h9"></path>
+								<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+							</svg>
+							<span class="visually-hidden">Editar</span>
+						</button>
+						<div class="news-text">${escapedTitle}</div>
+					</div>`;
+			}).join('\n');
+	} catch (err) {
+		console.error('Error cargando avisos:', err);
+	} finally {
+		isUpdating = false;
+	}
+}
+
+// Variables para controlar el estado y la actualización
+let lastAvisosHash = '';
+let isUpdating = false;
+
+// Función para generar un hash simple de los avisos
+function generateAvisosHash(avisos) {
+    return avisos.map(a => `${a.id}-${a.title}-${a.fecha_inicio}-${a.fecha_fin}`).join('|');
+}
+
+// Función para verificar si hay cambios reales en los avisos
+async function checkAndUpdateAvisos() {
+    if (isUpdating) return; // Evitar actualizaciones simultáneas
+    
+    try {
+        isUpdating = true;
+		const res = await fetch('/panel/avisos?all=1');
+        if (!res.ok) {
+            console.error('Error al verificar avisos:', res.status);
+            return;
+        }
+
+        const nuevosAvisos = await res.json();
+        const nuevoHash = generateAvisosHash(nuevosAvisos);
+
+        // Solo actualizar si hay cambios reales
+        if (nuevoHash !== lastAvisosHash) {
+            console.log('Cambios detectados, actualizando avisos...');
+            await fetchAndRenderAvisos();
+            lastAvisosHash = nuevoHash;
+        }
+    } catch (err) {
+        console.error('Error en checkAndUpdateAvisos:', err);
+    } finally {
+        isUpdating = false;
+    }
+}
+
+// Inicialización cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', async function() {
+    // Primera carga
+    await fetchAndRenderAvisos();
+    // Actualizar el hash inicial
+	try {
+		const res = await fetch('/panel/avisos?all=1');
+		if (res.ok) {
+			const avisos = await res.json();
+			lastAvisosHash = generateAvisosHash(avisos);
+		}
+	} catch (err) {
+		console.error('Error al inicializar hash:', err);
+	}
+    
+    // Configurar intervalo de verificación
+    setInterval(checkAndUpdateAvisos, 10000);
+});
+// Mostrar vista previa cuando se seleccione un fichero en el modal de edición
+const editFileInputGlobal = document.getElementById('editImageFile');
+if (editFileInputGlobal) {
+	editFileInputGlobal.addEventListener('change', function(e) {
+		const previewEl = document.getElementById('editImagePreview');
+		previewEl.innerHTML = '';
+		if (e.target.files && e.target.files[0]) {
+			const reader = new FileReader();
+			reader.onload = function(ev) {
+				const img = document.createElement('img');
+				img.src = ev.target.result;
+				img.style.maxWidth = '180px';
+				img.style.maxHeight = '100px';
+				img.style.borderRadius = '8px';
+				previewEl.appendChild(img);
+			};
+			reader.readAsDataURL(e.target.files[0]);
+		}
+	});
+}
+</script>
+<script>
+// Delegación de eventos para los botones de eliminar (maneja elementos generados dinámicamente)
+document.addEventListener('click', function(e) {
+	const btn = e.target.closest && e.target.closest('.close-btn');
+	if (!btn) return;
+	const id = btn.getAttribute('data-aviso-id');
+	if (!id) return;
+	// confirmar y llamar a la función existente
+	if (confirm('¿Eliminar esta noticia?')) {
+		deleteAviso(id);
+	}
+});
+</script>
+<script>
+// Edit modal handling
+document.addEventListener('click', function(e) {
+	const editBtn = e.target.closest && e.target.closest('.edit-btn');
+	if (!editBtn) return;
+	const id = editBtn.getAttribute('data-aviso-id');
+	if (!id) return;
+	openEditModal(id);
+});
+
+async function openEditModal(id) {
+	// Obtener datos del aviso desde la API
+	try {
+		const res = await fetch('/panel/avisos?all=1');
+		if (!res.ok) throw new Error('No se pudo cargar avisos');
+		const list = await res.json();
+		const aviso = list.find(a => String(a.id) === String(id));
+		if (!aviso) {
+			alert('Aviso no encontrado');
+			return;
+		}
+
+		// Rellenar formulario
+	document.getElementById('editId').value = aviso.id || '';
+	document.getElementById('editTitle').value = aviso.title || '';
+			// Mostrar vista previa de la imagen actual si existe
+			const previewEl = document.getElementById('editImagePreview');
+			previewEl.innerHTML = '';
+			if (aviso.image_url) {
+				const img = document.createElement('img');
+				img.src = aviso.image_url;
+				img.style.maxWidth = '180px';
+				img.style.maxHeight = '100px';
+				img.style.borderRadius = '8px';
+				previewEl.appendChild(img);
+			}
+			// Limpiar input file si existe
+			const editFileInput = document.getElementById('editImageFile');
+			if (editFileInput) editFileInput.value = '';
+		// Convertir ISO a formato datetime-local si existe
+		const toLocal = (iso) => {
+			if (!iso) return '';
+			const d = new Date(iso);
+			// Ajustar tz para que coincida con input datetime-local
+			const tzOffset = d.getTimezoneOffset() * 60000;
+			const local = new Date(d.getTime() - tzOffset);
+			return local.toISOString().slice(0,16);
+		};
+		document.getElementById('editStart').value = toLocal(aviso.fecha_inicio);
+		document.getElementById('editEnd').value = toLocal(aviso.fecha_fin);
+
+		// Mostrar modal
+		const editModalEl = document.getElementById('editModal');
+		const modal = new bootstrap.Modal(editModalEl);
+		modal.show();
+
+		// Guardar botón
+		const saveBtn = document.getElementById('saveEditBtn');
+		saveBtn.onclick = async function() {
+			await submitEdit(modal);
+		};
+
+	} catch (err) {
+		console.error(err);
+		alert('Error cargando aviso: ' + err.message);
+	}
+}
+
+async function submitEdit(modalInstance) {
+	// Validar elementos del DOM antes de usarlos
+	const idEl = document.getElementById('editId');
+	const titleEl = document.getElementById('editTitle');
+	const startEl = document.getElementById('editStart');
+	const endEl = document.getElementById('editEnd');
+
+	if (!idEl) { alert('ID del aviso no disponible'); return; }
+	if (!titleEl) { alert('Campo título no disponible'); return; }
+
+	const id = idEl.value;
+	const title = titleEl.value.trim();
+	const fecha_inicio = startEl ? (startEl.value || null) : null;
+	const fecha_fin = endEl ? (endEl.value || null) : null;
+
+	if (!title) { alert('El título no puede estar vacío'); return; }
+
+	// Si hay archivo seleccionado, subirlo vía FormData al endpoint específico y salir.
+	const fileInput = document.getElementById('editImageFile');
+	if (fileInput && fileInput.files && fileInput.files.length > 0) {
+		const fd = new FormData();
+		fd.append('photo', fileInput.files[0]);
+		if (title) fd.append('title', title);
+		if (fecha_inicio) fd.append('fecha_inicio', fecha_inicio);
+		if (fecha_fin) fd.append('fecha_fin', fecha_fin);
+		try {
+			const res = await fetch(`/panel/upload_image/${id}`, { method: 'POST', body: fd });
+			const contentType = (res.headers.get('content-type') || '').toLowerCase();
+			let data = null;
+			if (contentType.includes('application/json')) {
+				data = await res.json();
+			} else {
+				const text = await res.text();
+				console.error('Respuesta no-JSON al subir imagen:', text.slice(0,1000));
+				alert('Respuesta inesperada del servidor al subir imagen. Revisa el servidor o tu sesión.');
+				return;
+			}
+			if (!res.ok) {
+				alert('Error al subir imagen: ' + (data && data.error ? data.error : JSON.stringify(data)));
+				return;
+			}
+			modalInstance.hide();
+			await fetchAndRenderAvisos();
+			alert('Imagen subida y aviso actualizado');
+			return;
+		} catch (err) {
+			console.error(err);
+			alert('Error de red al subir imagen: ' + err.message + '. Si ves HTML en la consola del navegador, puede que la sesión haya expirado y el servidor esté devolviendo la página de login.');
+			return;
+		}
+	}
+
+	// Si no hay archivo, actualizar solo metadatos vía PUT
+	const payload = { title };
+	if (fecha_inicio) payload.fecha_inicio = fecha_inicio;
+	if (fecha_fin) payload.fecha_fin = fecha_fin;
+
+		try {
+			const res = await fetch(`/panel/edit/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+			const contentType2 = (res.headers.get('content-type') || '').toLowerCase();
+			let data2 = null;
+			if (contentType2.includes('application/json')) {
+				data2 = await res.json();
+			} else {
+				const text = await res.text();
+				console.error('Respuesta no-JSON al guardar aviso:', text.slice(0,1000));
+				alert('Respuesta inesperada del servidor al guardar. Revisa si tu sesión es válida o mira la consola del servidor.');
+				return;
+			}
+			if (!res.ok) {
+				alert('Error al guardar: ' + (data2 && data2.error ? data2.error : JSON.stringify(data2)));
+				return;
+			}
+			modalInstance.hide();
+			await fetchAndRenderAvisos();
+			alert('Aviso actualizado');
+		} catch (err) {
+			console.error(err);
+			alert('Error de red: ' + err.message);
+		}
+}
+</script>
+<script>
+// Auto-logout por inactividad: 4 minutos (240000 ms)
+(function() {
+	const INACTIVITY_LIMIT = 4 * 60 * 1000; // 4 minutos
+	let idleTimer = null;
+
+	function logoutNow() {
+		// Llamar a /logout en el servidor para limpiar la sesión y luego ir al login
+		try {
+			fetch('/logout', { method: 'GET', credentials: 'same-origin' })
+				.catch(err => console.warn('Error al llamar /logout:', err))
+				.finally(() => {
+					// Redirigir al login para pedir credenciales de nuevo
+					try {
+						window.location.href = '/login';
+					} catch (e) {
+						console.error('Error al redirigir al login tras logout:', e);
+					}
+				});
+		} catch (e) {
+			console.error('Error al iniciar logout:', e);
+			try { window.location.href = '/login'; } catch (e2) {}
+		}
+	}
+
+	function resetIdleTimer() {
+		if (idleTimer) clearTimeout(idleTimer);
+		idleTimer = setTimeout(logoutNow, INACTIVITY_LIMIT);
+	}
+
+	// Eventos que consideramos actividad del usuario
+	const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+	function addActivityListeners() {
+		events.forEach(ev => document.addEventListener(ev, resetIdleTimer, {passive: true}));
+		// Cuando la pestaña recupere el foco, reiniciamos
+		window.addEventListener('focus', resetIdleTimer);
+		document.addEventListener('visibilitychange', function() {
+			if (!document.hidden) resetIdleTimer();
+		});
+	}
+
+	// Inicializar
+	document.addEventListener('DOMContentLoaded', function() {
+		addActivityListeners();
+		resetIdleTimer();
+	});
+})();
+</script>
+</body>
+</html>
