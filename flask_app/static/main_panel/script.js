@@ -489,8 +489,8 @@ function iniciarPollingCambios() {
     // Verificar cambios inmediatamente
     verificarCambios();
     
-    // Configurar verificación cada 3 segundos (más frecuente para detectar cambios rápidamente)
-    hashPollInterval = setInterval(verificarCambios, 300000);
+    // Configurar verificación cada 10 segundos para detectar cambios continuamente
+    hashPollInterval = setInterval(verificarCambios, 10000);
     
     // Verificar cambios cuando la pestaña vuelve a estar activa
     document.addEventListener('visibilitychange', () => {
