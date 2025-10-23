@@ -32,15 +32,73 @@
 			html { zoom: 1; }
 			/* Permitir scroll en móviles para evitar problemas con barras de navegador */
 			html, body { overflow: auto; height: auto; }
-			body { position: relative; inset: auto; padding: 20px; }
+			body { position: relative; inset: auto; padding: 10px; }
 			/* Hacer la tarjeta más grande y fluida */
-			.frame { width: 94%; max-width: 94%; margin: 12px auto; }
-			.header { padding: 14px 16px; }
-			.brand h1 { font-size: 20px; }
-			.card { padding: 20px; border-radius: 10px; box-shadow: 0 8px 16px rgba(0,0,0,0.12); }
-			.card h2 { font-size: 20px; }
-			input[type="text"], input[type="password"]{ padding:12px 10px; font-size:16px }
-			.btn{ padding:12px; font-size:18px }
+			.frame { width: 96%; max-width: 96%; margin: 8px auto; }
+			.header { padding: 12px 14px; }
+			.brand h1 { font-size: 16px; }
+			.card { padding: 16px; border-radius: 8px; box-shadow: 0 6px 12px rgba(0,0,0,0.12); }
+			.card h2 { font-size: 18px; }
+			input[type="text"], input[type="password"]{ padding:10px 8px; font-size:16px }
+			.btn{ padding:10px; font-size:16px }
+		}
+
+		/* ===================== Pantallas muy pequeñas (375px) ===================== */
+		@media (max-width: 375px) {
+			html { zoom: 1; }
+			html, body { overflow: auto; height: auto; }
+			body { position: relative; inset: auto; padding: 5px; }
+			
+			.frame { 
+				width: 98%; 
+				max-width: 98%; 
+				margin: 4px auto; 
+			}
+			
+			.header { 
+				padding: 10px 12px; 
+			}
+			
+			.logo {
+				width: 40px;
+				height: 40px;
+			}
+			
+			.brand h1 { 
+				font-size: 14px; 
+				line-height: 1.2;
+			}
+			
+			.card { 
+				padding: 14px; 
+				border-radius: 6px; 
+				box-shadow: 0 4px 8px rgba(0,0,0,0.12); 
+			}
+			
+			.card h2 { 
+				font-size: 16px; 
+				margin-bottom: 14px;
+			}
+			
+			.field {
+				margin-bottom: 12px;
+			}
+			
+			input[type="text"], input[type="password"]{ 
+				padding: 8px 6px; 
+				font-size: 14px;
+				border-radius: 3px;
+			}
+			
+			.btn{ 
+				padding: 8px; 
+				font-size: 14px;
+				border-radius: 3px;
+			}
+			
+			.muted {
+				font-size: 11px;
+			}
 		}
 
 

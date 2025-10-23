@@ -367,6 +367,181 @@ body {
     .side-card-title { font-size: 16px; }
 }
 
+/* ===================== Responsive - Pantallas muy pequeñas (375px) ===================== */
+@media (max-width: 480px) {
+    body {
+        overflow: auto;
+        height: auto;
+        background: #222;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .header {
+        padding: 8px 6px;
+        min-height: 80px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .left-section {
+        order: 1;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: center;
+    }
+    
+    .logo {
+        height: 32px;
+        margin-right: 0;
+    }
+    
+    .school-name {
+        font-size: 10px;
+        line-height: 1.1;
+        text-align: center;
+    }
+    
+    .center-section {
+        order: 2;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+    
+    .time {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+    
+    .time .ampm {
+        font-size: 0.5em;
+        margin-left: 2px;
+    }
+    
+    .right-section {
+        order: 3;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        transform: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .weather-info {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-right: 0;
+    }
+    
+    .weather-icon {
+        font-size: 16px;
+    }
+    
+    .temperature {
+        font-size: 12px;
+        margin-bottom: 0;
+    }
+    
+    .weather-description {
+        font-size: 8px;
+        display: none; /* Ocultar en pantallas muy pequeñas */
+    }
+    
+    .weather-details {
+        align-items: center;
+        flex-direction: row;
+        gap: 4px;
+    }
+    
+    .date {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        margin-left: 0;
+    }
+
+    .main-content {
+        margin: 8px 6px;
+        gap: 8px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .main-card {
+        min-height: 180px;
+        border-radius: 12px;
+        width: 100%;
+    }
+    
+    .main-card-overlay {
+        border-radius: 12px;
+        background: rgba(0,0,0,0.3);
+    }
+    
+    .main-card-text {
+        font-size: 14px;
+        padding: 0 0 12px 12px;
+        max-width: 90%;
+        line-height: 1.3;
+    }
+    
+    .main-card-badge {
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+        bottom: 8px !important;
+        right: 8px !important;
+        border-radius: 6px !important;
+    }
+
+    .side-cards {
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .side-card {
+        min-height: 80px;
+        border-radius: 8px;
+        width: 100%;
+    }
+    
+    .side-card-overlay {
+        padding: 8px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 8px;
+    }
+    
+    .side-card-date {
+        font-size: 8px;
+        margin-bottom: 2px;
+        line-height: 1.2;
+    }
+    
+    .side-card-title {
+        font-size: 12px;
+        line-height: 1.3;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+}
+
 /* ===================== Estilos para Estados de Error y Vacío ===================== */
 
 /* Estado vacío - cuando no hay noticias */
