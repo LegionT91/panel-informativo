@@ -116,13 +116,13 @@
         <div class="main-card" style="--bg-url:url('{{ main_card.imagen_url }}');">
             <div class="main-card-overlay">
                 {% if main_card.id == 'empty_database' %}
-                <div class="main-card-text empty-state" data-aviso-id="{{ main_card.id or '' }}">
+                <div class="empty-state" data-aviso-id="{{ main_card.id or '' }}">
                     <i class="bi bi-inbox empty-icon"></i>
                     <div class="empty-message">{{ main_card.titulo|safe }}</div>
                     <div class="empty-subtitle">Contacta al administrador para agregar noticias</div>
                 </div>
                 {% elif main_card.id and main_card.id.startswith('error_') %}
-                <div class="main-card-text error-state" data-aviso-id="{{ main_card.id or '' }}">
+                <div class="error-state" data-aviso-id="{{ main_card.id or '' }}">
                     <i class="bi bi-exclamation-triangle error-icon"></i>
                     <div class="error-message">{{ main_card.titulo|safe }}</div>
                     <div class="error-subtitle">
@@ -134,6 +134,8 @@
                             La base de datos no existe o no está configurada
                         {% elif error_type == 'table_not_found' %}
                             La tabla de noticias no existe en la base de datos
+                        {% elif error_type == 'connection_refused' %}
+                            El servidor de base de datos no está disponible
                         {% else %}
                             Error técnico - contacta al administrador
                         {% endif %}
@@ -181,6 +183,8 @@
             try {
                 if (typeof input === 'string') {
                     const s = input.trim();
+                    if (!s) return null;
+                    
                     // DD/MM/YYYY or DD/MM/YYYY HH:MM
                     const m = /^([0-3]?\d)\/(0?\d|1[0-2])\/(\d{4})(?:\s+([0-2]?\d):([0-5]?\d))?$/.exec(s);
                     if (m) {
@@ -189,24 +193,37 @@
                         const year = parseInt(m[3], 10);
                         const hh = m[4] ? parseInt(m[4], 10) : 0;
                         const mm = m[5] ? parseInt(m[5], 10) : 0;
-                        return new Date(year, month - 1, day, hh, mm, 0, 0);
+                        
+                        // Validar rangos
+                        if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2100) {
+                            return null;
+                        }
+                        if (hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+                            return null;
+                        }
+                        
+                        const date = new Date(year, month - 1, day, hh, mm, 0, 0);
+                        return isNaN(date.getTime()) ? null : date;
                     }
+                    
                     // ISO-like YYYY-MM-DD[ T]HH:MM[:SS]
                     let iso = s.replace(' ', 'T');
                     if (/^\d{4}-\d{2}-\d{2}([T\s].*)?$/.test(iso)) {
                         const timePart = iso.split('T')[1];
                         if (timePart && timePart.length === 5) iso += ':00';
                         const d = new Date(iso);
-                        if (!isNaN(d.getTime())) return d;
+                        return isNaN(d.getTime()) ? null : d;
                     }
-                    // Fallback
+                    
+                    // Fallback con validación
                     const d2 = new Date(s);
                     return isNaN(d2.getTime()) ? null : d2;
                 } else if (input instanceof Date) {
                     return isNaN(input.getTime()) ? null : input;
                 }
                 return null;
-            } catch (_) {
+            } catch (error) {
+                console.warn('Error parseando fecha:', input, error);
                 return null;
             }
         }
@@ -223,116 +240,210 @@
                 const mainCardEl = document.querySelector('.main-card');
                 const overlayEl = document.querySelector('.main-card-overlay');
                 const textEl = document.querySelector('.main-card-text');
-                if (!mainCardEl || !overlayEl || !textEl) return;
+                
+                if (!mainCardEl || !overlayEl || !textEl) {
+                    console.warn('Elementos del main card no encontrados');
+                    return;
+                }
 
-                const bg = item.imagen_url || (item.imagen || '');
-                if (bg) {
+                // Validar item
+                if (!item || typeof item !== 'object') {
+                    console.warn('Item inválido para main card:', item);
+                    return;
+                }
+
+                // Configurar imagen de fondo con fallback
+                const bg = item.imagen_url || item.imagen || '/static/main_panel/img/logo.png';
+                try {
                     mainCardEl.style.removeProperty('background-image');
                     mainCardEl.style.setProperty('--bg-url', `url('${bg}')`);
+                } catch (bgError) {
+                    console.warn('Error configurando imagen de fondo:', bgError);
+                    mainCardEl.style.setProperty('--bg-url', `url('/static/main_panel/img/logo.png')`);
                 }
-                textEl.innerHTML = (item.titulo || item.title || '').toString();
 
-                // Badge dinámico
+                // Configurar texto con sanitización
+                const titulo = (item.titulo || item.title || 'Sin título').toString();
+                textEl.innerHTML = titulo.replace(/[<>]/g, ''); // Sanitización básica
+
+                // Badge dinámico con mejor manejo de errores
                 let badgeText = '';
-                // Preferir etiqueta generada por backend
-                if (item.etiqueta_fecha) {
-                    badgeText = item.etiqueta_fecha;
-                } else if (item.fecha_inicio) {
-                    // Calcular proximidad desde fecha de inicio respecto a "hoy"
-                    const start = parseDateFromAny(item.fecha_inicio);
-                    if (!isNaN(start.getTime())) {
-                        const today = new Date();
-                        const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-                        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                        const msPerDay = 24 * 60 * 60 * 1000;
-                        const delta = Math.round((startDate - todayDate) / msPerDay);
-                        if (delta === 0) {
-                            badgeText = 'Hoy';
-                        } else if (delta === 1) {
-                            badgeText = 'Mañana';
-                        } else if (delta > 1 && delta <= 30) {
-                            badgeText = `${delta} días`;
-                        } else {
-                            // Mostrar solo la fecha de inicio en formato dd/mm/yyyy
-                            badgeText = formatDDMMYYYY(start);
+                try {
+                    // Preferir etiqueta generada por backend
+                    if (item.etiqueta_fecha && typeof item.etiqueta_fecha === 'string') {
+                        badgeText = item.etiqueta_fecha;
+                    } else if (item.fecha_inicio) {
+                        // Calcular proximidad desde fecha de inicio respecto a "hoy"
+                        const start = parseDateFromAny(item.fecha_inicio);
+                        if (start && !isNaN(start.getTime())) {
+                            const today = new Date();
+                            const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                            const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                            const msPerDay = 24 * 60 * 60 * 1000;
+                            const delta = Math.round((startDate - todayDate) / msPerDay);
+                            
+                            if (delta === 0) {
+                                badgeText = 'Hoy';
+                            } else if (delta === 1) {
+                                badgeText = 'Mañana';
+                            } else if (delta > 1 && delta <= 30) {
+                                badgeText = `${delta} días`;
+                            } else {
+                                // Mostrar solo la fecha de inicio en formato dd/mm/yyyy
+                                badgeText = formatDDMMYYYY(start);
+                            }
                         }
                     }
+                } catch (dateError) {
+                    console.warn('Error calculando fecha para badge:', dateError);
                 }
 
+                // Crear o actualizar badge
                 let badgeEl = overlayEl.querySelector('#dynamic-badge');
                 if (!badgeEl) {
-                    badgeEl = document.createElement('div');
-                    badgeEl.id = 'dynamic-badge';
-                    badgeEl.className = 'main-card-badge';
-                    badgeEl.style.position = 'absolute';
-                    badgeEl.style.bottom = '16px';
-                    badgeEl.style.right = '16px';
-                    badgeEl.style.background = 'rgba(0,0,0,0.65)';
-                    badgeEl.style.color = '#fff';
-                    badgeEl.style.padding = '12px 18px';
-                    badgeEl.style.borderRadius = '10px';
-                    badgeEl.style.fontWeight = '800';
-                    badgeEl.style.fontSize = '32px';
-                    badgeEl.style.lineHeight = '1.1';
-                    badgeEl.style.letterSpacing = '0.2px';
-                    badgeEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
-                    overlayEl.appendChild(badgeEl);
+                    try {
+                        badgeEl = document.createElement('div');
+                        badgeEl.id = 'dynamic-badge';
+                        badgeEl.className = 'main-card-badge';
+                        badgeEl.style.position = 'absolute';
+                        badgeEl.style.bottom = '16px';
+                        badgeEl.style.right = '16px';
+                        badgeEl.style.background = 'rgba(0,0,0,0.65)';
+                        badgeEl.style.color = '#fff';
+                        badgeEl.style.padding = '12px 18px';
+                        badgeEl.style.borderRadius = '10px';
+                        badgeEl.style.fontWeight = '800';
+                        badgeEl.style.fontSize = '32px';
+                        badgeEl.style.lineHeight = '1.1';
+                        badgeEl.style.letterSpacing = '0.2px';
+                        badgeEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
+                        overlayEl.appendChild(badgeEl);
+                    } catch (badgeError) {
+                        console.warn('Error creando badge:', badgeError);
+                        return;
+                    }
                 }
+                
                 badgeEl.textContent = badgeText || '';
                 badgeEl.style.display = badgeText ? 'block' : 'none';
             } catch (e) {
-                console.warn('Error actualizando main card:', e);
+                console.error('Error crítico actualizando main card:', e);
+                // Fallback: mostrar contenido básico
+                try {
+                    const textEl = document.querySelector('.main-card-text');
+                    if (textEl) {
+                        textEl.innerHTML = 'Error cargando contenido';
+                    }
+                } catch (fallbackError) {
+                    console.error('Error en fallback:', fallbackError);
+                }
             }
         }
 
         function renderSideCards(startIndex) {
             try {
                 const container = document.querySelector('.side-cards');
-                if (!container) return;
+                if (!container) {
+                    console.warn('Container de side cards no encontrado');
+                    return;
+                }
+                
+                if (!Array.isArray(rotables) || rotables.length === 0) {
+                    console.warn('No hay datos rotables disponibles');
+                    return;
+                }
+                
                 const n = rotables.length;
                 const items = [];
+                const maxSideCards = 3;
+                
                 // Mostrar los 3 siguientes a partir de startIndex (excluyendo el main actual)
-                for (let i = 1; i <= Math.min(3, n - 1); i++) {
+                for (let i = 1; i <= Math.min(maxSideCards, n - 1); i++) {
                     const idx = (startIndex + i) % n;
-                    items.push(rotables[idx]);
+                    const item = rotables[idx];
+                    if (item && typeof item === 'object') {
+                        items.push(item);
+                    }
                 }
-                const html = items.map(ev => {
-                    const bg = ev.imagen_url || ev.imagen || '';
-                    const titulo = (ev.titulo || ev.title || '').toString();
-                    // Calcular etiqueta de fecha similar al main-card
-                    let etiqueta = '';
-                    if (ev.etiqueta_fecha) {
-                        etiqueta = ev.etiqueta_fecha;
-                    } else if (ev.fecha_inicio) {
-                        const start = parseDateFromAny(ev.fecha_inicio);
-                        if (start) {
-                            const today = new Date();
-                            const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-                            const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                            const msPerDay = 24 * 60 * 60 * 1000;
-                            const delta = Math.round((startDate - todayDate) / msPerDay);
-                            if (delta === 0) etiqueta = 'Hoy';
-                            else if (delta === 1) etiqueta = 'Mañana';
-                            else if (delta > 1 && delta <= 30) etiqueta = `${delta} días`;
-                            else etiqueta = formatDDMMYYYY(start);
+                
+                const html = items.map((ev, index) => {
+                    try {
+                        // Validar y sanitizar datos
+                        const bg = (ev.imagen_url || ev.imagen || '/static/main_panel/img/logo.png').replace(/[<>'"]/g, '');
+                        const titulo = (ev.titulo || ev.title || 'Sin título').toString().replace(/[<>]/g, '');
+                        const avisoId = (ev.id || `fallback_${index}`).toString().replace(/[<>'"]/g, '');
+                        
+                        // Calcular etiqueta de fecha con manejo de errores
+                        let etiqueta = '';
+                        try {
+                            if (ev.etiqueta_fecha && typeof ev.etiqueta_fecha === 'string') {
+                                etiqueta = ev.etiqueta_fecha;
+                            } else if (ev.fecha_inicio) {
+                                const start = parseDateFromAny(ev.fecha_inicio);
+                                if (start && !isNaN(start.getTime())) {
+                                    const today = new Date();
+                                    const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                                    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                                    const msPerDay = 24 * 60 * 60 * 1000;
+                                    const delta = Math.round((startDate - todayDate) / msPerDay);
+                                    
+                                    if (delta === 0) etiqueta = 'Hoy';
+                                    else if (delta === 1) etiqueta = 'Mañana';
+                                    else if (delta > 1 && delta <= 30) etiqueta = `${delta} días`;
+                                    else etiqueta = formatDDMMYYYY(start);
+                                }
+                            }
+                            
+                            if (!etiqueta && ev.fecha_fin) {
+                                const end = parseDateFromAny(ev.fecha_fin);
+                                if (end && !isNaN(end.getTime())) {
+                                    etiqueta = formatDDMMYYYY(end);
+                                }
+                            }
+                        } catch (dateError) {
+                            console.warn('Error calculando fecha para side card:', dateError);
                         }
-                    }
-                    if (!etiqueta && ev.fecha_fin) {
-                        const end = parseDateFromAny(ev.fecha_fin);
-                        if (end) etiqueta = formatDDMMYYYY(end);
-                    }
-                    return `
-                        <div class="side-card" data-aviso-id="${ev.id || ''}" style="--bg-url:url('${bg}');">
-                            <div class="side-card-overlay">
-                                <div class="side-card-date">${etiqueta}</div>
-                                <div class="side-card-title">${titulo}</div>
+                        
+                        return `
+                            <div class="side-card" data-aviso-id="${avisoId}" style="--bg-url:url('${bg}');">
+                                <div class="side-card-overlay">
+                                    <div class="side-card-date">${etiqueta}</div>
+                                    <div class="side-card-title">${titulo}</div>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    } catch (itemError) {
+                        console.warn('Error procesando item de side card:', itemError);
+                        return `
+                            <div class="side-card" data-aviso-id="error_${index}" style="--bg-url:url('/static/main_panel/img/logo.png');">
+                                <div class="side-card-overlay">
+                                    <div class="side-card-date">Error</div>
+                                    <div class="side-card-title">Error cargando</div>
+                                </div>
+                            </div>
+                        `;
+                    }
                 }).join('');
+                
                 container.innerHTML = html;
             } catch (e) {
-                console.warn('Error actualizando side cards:', e);
+                console.error('Error crítico actualizando side cards:', e);
+                // Fallback: mostrar mensaje de error
+                try {
+                    const container = document.querySelector('.side-cards');
+                    if (container) {
+                        container.innerHTML = `
+                            <div class="side-card" style="--bg-url:url('/static/main_panel/img/logo.png');">
+                                <div class="side-card-overlay">
+                                    <div class="side-card-date">Error</div>
+                                    <div class="side-card-title">Error cargando noticias</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } catch (fallbackError) {
+                    console.error('Error en fallback de side cards:', fallbackError);
+                }
             }
         }
 

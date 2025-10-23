@@ -248,8 +248,25 @@ def register_routes(app):
             error_message = str(e)
             error_type = 'database_connection'
             current_app.logger.exception('Error en home')
+            
+            # Determinar el tipo de error específico
+            if 'Access denied' in str(e) or 'authentication' in str(e).lower():
+                error_type = 'database_auth'
+                error_title = 'Error de autenticación<br>en la base de datos'
+            elif 'Unknown database' in str(e) or 'database' in str(e).lower() and 'not found' in str(e).lower():
+                error_type = 'database_not_found'
+                error_title = 'Base de datos<br>no encontrada'
+            elif 'Table' in str(e) and 'doesn\'t exist' in str(e):
+                error_type = 'table_not_found'
+                error_title = 'Tabla de noticias<br>no encontrada'
+            elif 'Connection refused' in str(e) or 'timeout' in str(e).lower():
+                error_type = 'connection_refused'
+                error_title = 'Servidor de base de datos<br>no disponible'
+            else:
+                error_title = f'Error de conexión<br>{error_message[:50]}{"..." if len(error_message) > 50 else ""}'
+            
             main_card = {
-                'titulo': f'Error de conexión<br>{error_message}',
+                'titulo': error_title,
                 'imagen_url': '/static/main_panel/img/logo.png',
                 'etiqueta_fecha': '',
                 'id': f'error_{error_type}'

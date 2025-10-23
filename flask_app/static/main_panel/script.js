@@ -119,16 +119,72 @@ async function actualizarClima() {
 async function cargarAvisos() {
     try {
         const response = await fetch('/panel/avisos');
+        
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+        }
+        
         const data = await response.json();
-        avisos = data;
+        
+        // Validar que la respuesta sea un array
+        if (!Array.isArray(data)) {
+            console.warn('Respuesta de API no es un array:', data);
+            avisos = [];
+        } else {
+            avisos = data;
+        }
+        
         // Limitar el set de rotación a los 4 que están en la vista (main + 3 laterales)
         avisosEnPantalla = obtenerAvisosInicialesDesdeDOM(avisos);
         console.log('Avisos cargados:', avisos.length);
+        
         if (avisosEnPantalla.length > 0) {
             iniciarRotacionAvisos();
+        } else {
+            console.warn('No hay avisos disponibles para rotación');
+            // Mostrar mensaje de fallback si no hay avisos
+            mostrarMensajeFallback();
         }
     } catch (error) {
         console.error('Error cargando avisos:', error);
+        // Mostrar mensaje de error en la interfaz
+        mostrarErrorCarga();
+    }
+}
+
+// Función para mostrar mensaje de fallback cuando no hay avisos
+function mostrarMensajeFallback() {
+    try {
+        const mainCard = document.querySelector('.main-card-text');
+        if (mainCard && !mainCard.classList.contains('error-state') && !mainCard.classList.contains('empty-state')) {
+            mainCard.innerHTML = `
+                <div class="fallback-content">
+                    <i class="bi bi-info-circle fallback-icon"></i>
+                    <div class="fallback-message">No hay noticias disponibles</div>
+                    <div class="fallback-subtitle">Las noticias se cargarán automáticamente cuando estén disponibles</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.warn('Error mostrando mensaje de fallback:', error);
+    }
+}
+
+// Función para mostrar error de carga
+function mostrarErrorCarga() {
+    try {
+        const mainCard = document.querySelector('.main-card-text');
+        if (mainCard && !mainCard.classList.contains('error-state') && !mainCard.classList.contains('empty-state')) {
+            mainCard.innerHTML = `
+                <div class="fallback-content">
+                    <i class="bi bi-exclamation-triangle fallback-icon" style="color: #dc3545;"></i>
+                    <div class="fallback-message" style="color: #dc3545;">Error cargando noticias</div>
+                    <div class="fallback-subtitle">Intenta recargar la página en unos momentos</div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.warn('Error mostrando mensaje de error:', error);
     }
 }
 
