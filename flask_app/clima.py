@@ -107,37 +107,37 @@ def obtener_icono_bootstrap(codigo_clima):
 
 def obtener_descripcion_clima(codigo_clima):
     """
-    Convierte el código del clima a una descripción en español
+    Convierte el código del clima a una descripción en español simplificada
     """
     descripciones = {
         0: "Despejado",
-        1: "Principalmente despejado",
-        2: "Parcialmente nublado",
+        1: "Despejado",
+        2: "Nublado",
         3: "Nublado",
         45: "Niebla",
-        48: "Niebla con escarcha",
-        51: "Llovizna ligera",
-        53: "Llovizna moderada",
-        55: "Llovizna densa",
-        56: "Llovizna helada ligera",
-        57: "Llovizna helada densa",
-        61: "Lluvia ligera",
-        63: "Lluvia moderada",
-        65: "Lluvia intensa",
-        66: "Lluvia helada ligera",
-        67: "Lluvia helada intensa",
-        71: "Nieve ligera",
-        73: "Nieve moderada",
-        75: "Nieve intensa",
-        77: "Granizo de nieve",
-        80: "Chubascos ligeros",
-        81: "Chubascos moderados",
-        82: "Chubascos violentos",
-        85: "Chubascos de nieve ligeros",
-        86: "Chubascos de nieve intensos",
+        48: "Niebla",
+        51: "Llovizna",
+        53: "Llovizna",
+        55: "Llovizna",
+        56: "Llovizna",
+        57: "Llovizna",
+        61: "Lluvia",
+        63: "Lluvia",
+        65: "Lluvia",
+        66: "Lluvia",
+        67: "Lluvia",
+        71: "Nieve",
+        73: "Nieve",
+        75: "Nieve",
+        77: "Granizo",
+        80: "Chubascos",
+        81: "Chubascos",
+        82: "Chubascos",
+        85: "Chubascos",
+        86: "Chubascos",
         95: "Tormenta",
-        96: "Tormenta con granizo ligero",
-        99: "Tormenta con granizo intenso"
+        96: "Tormenta",
+        99: "Tormenta"
     }
     
     return descripciones.get(codigo_clima, "Soleado")
