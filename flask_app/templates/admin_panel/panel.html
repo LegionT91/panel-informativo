@@ -181,7 +181,6 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 // Función para eliminar aviso vía API
 async function deleteAviso(id) {
-	if (!confirm('¿Eliminar esta noticia?')) return;
 	try {
 		const res = await fetch(`/panel/delete/${id}`, { method: 'DELETE' });
 		const data = await res.json();

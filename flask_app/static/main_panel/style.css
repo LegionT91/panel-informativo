@@ -185,7 +185,8 @@ body {
 
 .date {
     font-size: 47px;
-    font-weight: 400;
+    font-weight: 700;
+    letter-spacing: 2px;
     color: #fff;
 }
 .main-content {
@@ -301,8 +302,8 @@ body {
     }
 }
 
-/* ===================== Responsive - Móviles ===================== */
-@media (max-width: 600px) {
+/* ===================== Responsive - Móviles y Tablets ===================== */
+@media (max-width: 912px) {
     body {
         overflow: auto;
         height: auto;
@@ -332,7 +333,7 @@ body {
     .temperature { font-size: 16px; }
     .weather-description { font-size: 10px; }
     .weather-details { align-items: center; }
-    .date { font-size: 14px; margin-left: 0; }
+    .date { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; margin-left: 0; }
 
     .main-content {
         margin: 12px;
@@ -582,7 +583,7 @@ body {
 }
 
 /* Responsive para estados de error y vacío */
-@media (max-width: 600px) {
+@media (max-width: 912px) {
     .empty-state, .error-state {
         padding: 20px;
         font-size: 18px;
