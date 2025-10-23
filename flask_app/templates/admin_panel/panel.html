@@ -282,32 +282,139 @@ async function fetchAndRenderAvisos() {
 		const future = withValidDates.filter(p => p._ms > now).sort((a, b) => a._ms - b._ms);
 		
 		// Concatenar todos los grupos
-		avisos = [...started, ...future, ...noDates];
+		const allAvisos = [...started, ...future, ...noDates];
+		
+		// Agrupar por mes
+		const avisosByMonth = {};
+		const monthNames = [
+			'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+			'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+		];
+		
+		allAvisos.forEach(aviso => {
+			let monthKey = 'Sin fecha';
+			if (aviso._ms > 0) {
+				const date = new Date(aviso._ms);
+				const year = date.getFullYear();
+				const month = date.getMonth();
+				monthKey = `${monthNames[month]} ${year}`;
+			}
+			
+			if (!avisosByMonth[monthKey]) {
+				avisosByMonth[monthKey] = [];
+			}
+			avisosByMonth[monthKey].push(aviso);
+		});
+		
+		// Ordenar los meses: mes actual primero, luego más recientes, luego sin fecha
+		const currentDate = new Date();
+		const currentYear = currentDate.getFullYear();
+		const currentMonth = currentDate.getMonth();
+		
+		const sortedMonths = Object.keys(avisosByMonth).sort((a, b) => {
+			if (a === 'Sin fecha') return 1;
+			if (b === 'Sin fecha') return -1;
+			
+			// Extraer año y mes para comparar
+			const getMonthYear = (monthStr) => {
+				const parts = monthStr.split(' ');
+				const month = monthNames.indexOf(parts[0]);
+				const year = parseInt(parts[1]);
+				return { year, month };
+			};
+			
+			const aInfo = getMonthYear(a);
+			const bInfo = getMonthYear(b);
+			
+			// Verificar si es el mes actual
+			const isACurrent = aInfo.year === currentYear && aInfo.month === currentMonth;
+			const isBCurrent = bInfo.year === currentYear && bInfo.month === currentMonth;
+			
+			// El mes actual siempre va primero
+			if (isACurrent && !isBCurrent) return -1;
+			if (!isACurrent && isBCurrent) return 1;
+			
+			// Si ambos son el mes actual, mantener orden original
+			if (isACurrent && isBCurrent) return 0;
+			
+			// Para el resto, ordenar por fecha (más recientes primero)
+			if (aInfo.year !== bInfo.year) {
+				return bInfo.year - aInfo.year; // Años más recientes primero
+			}
+			return bInfo.month - aInfo.month; // Meses más recientes primero
+		});
 		
 		console.log('Avisos procesados:', {
-			total: avisos.length,
+			total: allAvisos.length,
 			started: started.length,
 			future: future.length,
-			noDates: noDates.length
+			noDates: noDates.length,
+			months: sortedMonths.length
 		});
 		const logoUrl = '{{ url_for("static", filename="logo.png") }}';
-		container.innerHTML = avisos.map(aviso => {
-				const img = aviso.image_url && aviso.image_url !== '' ? aviso.image_url : logoUrl;
-				const escapedTitle = (aviso.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-				return `
-					<div class="news-card" id="aviso-${aviso.id}" style="position:relative;">
-						<img class="news-img" src="${img}" alt="${escapedTitle}" />
-						<button class="close-btn" title="Eliminar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:8px;top:8px;">&times;</button>
-						<button class="edit-btn" title="Editar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:56px;top:8px;">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">
-								<path d="M12 20h9"></path>
-								<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-							</svg>
-							<span class="visually-hidden">Editar</span>
-						</button>
-						<div class="news-text">${escapedTitle}</div>
-					</div>`;
-			}).join('\n');
+		
+		// Generar HTML con separación vertical por mes
+		let html = '';
+		sortedMonths.forEach(monthKey => {
+			const monthAvisos = avisosByMonth[monthKey];
+			if (monthAvisos.length > 0) {
+				// Agregar contenedor del mes con separación vertical
+				html += `
+					<div class="month-container" style="
+						display: flex;
+						flex-direction: column;
+						margin-bottom: 30px;
+						border-left: 3px solid #ddd;
+						padding-left: 20px;
+						position: relative;
+					">
+						<div class="month-header" style="
+							background: #f8f9fa;
+							padding: 8px 16px;
+							margin: 0 0 15px -20px;
+							border-radius: 0 8px 8px 0;
+							font-size: 0.9em;
+							font-weight: 600;
+							color: #666;
+							border: 1px solid #e9ecef;
+							width: fit-content;
+						">
+							${monthKey}
+						</div>
+						<div class="month-news" style="
+							display: flex;
+							flex-direction: column;
+							gap: 15px;
+						">
+				`;
+				
+				// Agregar noticias del mes
+				html += monthAvisos.map(aviso => {
+					const img = aviso.image_url && aviso.image_url !== '' ? aviso.image_url : logoUrl;
+					const escapedTitle = (aviso.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+					return `
+						<div class="news-card" id="aviso-${aviso.id}" style="position:relative;">
+							<img class="news-img" src="${img}" alt="${escapedTitle}" />
+							<button class="close-btn" title="Eliminar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:8px;top:8px;">&times;</button>
+							<button class="edit-btn" title="Editar noticia" data-aviso-id="${aviso.id}" style="position:absolute;right:56px;top:8px;">
+								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#fff;">
+									<path d="M12 20h9"></path>
+									<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+								</svg>
+								<span class="visually-hidden">Editar</span>
+							</button>
+							<div class="news-text">${escapedTitle}</div>
+						</div>`;
+				}).join('\n');
+				
+				html += `
+						</div>
+					</div>
+				`;
+			}
+		});
+		
+		container.innerHTML = html;
 	} catch (err) {
 		console.error('Error cargando avisos:', err);
 	} finally {
