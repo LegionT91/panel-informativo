@@ -167,6 +167,9 @@ async function cargarAvisos() {
         avisosEnPantalla = obtenerAvisosInicialesDesdeDOM(avisos);
         console.log('Avisos cargados:', avisos.length);
         
+        // Reiniciar el índice de rotación para asegurar que comience con noticias de hoy
+        mainCardRotationIndex = 0;
+        
         if (avisosEnPantalla.length > 0) {
             iniciarRotacionAvisos();
         } else {
@@ -268,11 +271,15 @@ function mantenerTarjetasLaterales() {
 function obtenerAvisosVentanaCircular(cantidadRequerida) {
     const fuente = avisosEnPantalla.length ? avisosEnPantalla : avisos;
     if (fuente.length === 0) return [];
+    
+    // Priorizar noticias de hoy en las primeras posiciones
+    const avisosPriorizados = priorizarAvisosDeHoy(fuente);
+    
     const result = [];
     // Principal es offset 0; laterales deben ser offsets 1..cantidad
     for (let i = 1; i <= cantidadRequerida; i++) {
-        const idx = (mainCardRotationIndex + i) % fuente.length;
-        result.push(fuente[idx]);
+        const idx = (mainCardRotationIndex + i) % avisosPriorizados.length;
+        result.push(avisosPriorizados[idx]);
     }
     return result;
 }
@@ -469,13 +476,51 @@ function actualizarBadgeFechaPrincipal(aviso) {
     badge.style.display = label ? 'block' : 'none';
 }
 
+// Función para priorizar noticias de hoy en las primeras posiciones
+function priorizarAvisosDeHoy(avisos) {
+    if (!avisos || avisos.length === 0) return avisos;
+    
+    const hoy = new Date();
+    const hoyStr = hoy.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    const avisosDeHoy = [];
+    const otrosAvisos = [];
+    
+    avisos.forEach(aviso => {
+        if (aviso.fecha_inicio) {
+            try {
+                const fechaAviso = new Date(aviso.fecha_inicio);
+                const fechaAvisoStr = fechaAviso.toISOString().split('T')[0];
+                
+                if (fechaAvisoStr === hoyStr) {
+                    avisosDeHoy.push(aviso);
+                } else {
+                    otrosAvisos.push(aviso);
+                }
+            } catch (e) {
+                // Si hay error parseando la fecha, lo tratamos como otro aviso
+                otrosAvisos.push(aviso);
+            }
+        } else {
+            // Avisos sin fecha van al final
+            otrosAvisos.push(aviso);
+        }
+    });
+    
+    // Retornar primero los de hoy, luego los demás
+    return [...avisosDeHoy, ...otrosAvisos];
+}
+
 // Función para obtener el siguiente aviso para el recuadro principal
 function obtenerSiguienteAvisoParaPrincipal() {
     const fuente = avisosEnPantalla.length ? avisosEnPantalla : avisos;
     if (fuente.length === 0) return null;
     
+    // Priorizar noticias de hoy en las primeras posiciones
+    const avisosPriorizados = priorizarAvisosDeHoy(fuente);
+    
     // Obtener el aviso en el índice actual del recuadro principal
-    return fuente[mainCardRotationIndex % fuente.length];
+    return avisosPriorizados[mainCardRotationIndex % avisosPriorizados.length];
 }
 
 // Función para iniciar la rotación de avisos
@@ -678,15 +723,24 @@ function obtenerIdAvisoPrincipalInicial() {
 }
 
 function obtenerAvisosInicialesDesdeDOM(listaAvisosApi) {
-    if (!window.__idsInicialesAvisos || !Array.isArray(window.__idsInicialesAvisos)) return listaAvisosApi.slice(0, 4);
+    if (!window.__idsInicialesAvisos || !Array.isArray(window.__idsInicialesAvisos)) {
+        // Si no hay IDs iniciales, priorizar noticias de hoy y tomar las primeras 4
+        const avisosPriorizados = priorizarAvisosDeHoy(listaAvisosApi);
+        return avisosPriorizados.slice(0, 4);
+    }
+    
     const byId = new Map(listaAvisosApi.map(a => [a.id, a]));
     const result = [];
     window.__idsInicialesAvisos.forEach(id => {
         const a = byId.get(id);
         if (a) result.push(a);
     });
+    
+    // Priorizar noticias de hoy en el resultado final
+    const avisosPriorizados = priorizarAvisosDeHoy(result);
+    
     // Asegurar máximo 4
-    return result.slice(0, 4);
+    return avisosPriorizados.slice(0, 4);
 }
 
 // Inicialización
