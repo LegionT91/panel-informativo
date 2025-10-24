@@ -131,7 +131,7 @@ def require_login_for_panel(app):
         except Exception:
             return None
         # Rutas públicas del panel
-        public_panel_paths = ['/panel/avisos', '/api/clima']
+        public_panel_paths = ['/panel/avisos', '/api/clima', '/panel/avisos_hash']
         if path.startswith('/panel') and path not in public_panel_paths:
             if not current_user.is_authenticated:
                 return redirect(url_for('login', next=request.url))

@@ -9,6 +9,23 @@ let currentMainCardId = null;  // Para evitar duplicados con el recuadro princip
 let usedAvisoIds = new Set();  // Para rastrear avisos ya mostrados
 let mainCardRotationIndex = 0;  // Índice específico para el recuadro principal
 
+// Función auxiliar para validar y parsear JSON de forma segura
+async function parseJsonSafely(response) {
+    try {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.warn('Respuesta no es JSON. Content-Type:', contentType);
+            const text = await response.text();
+            console.warn('Contenido de respuesta:', text.substring(0, 200));
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error parseando JSON:', error);
+        return null;
+    }
+}
+
 // Función para actualizar hora y fecha con animaciones suaves
 function actualizarHoraFecha() {
     try {
@@ -77,7 +94,12 @@ function actualizarHoraFecha() {
 async function actualizarClima() {
     try {
         const response = await fetch('/api/clima');
-        const clima = await response.json();
+        const clima = await parseJsonSafely(response);
+        
+        if (!clima) {
+            console.warn('No se pudo obtener datos de clima válidos');
+            return;
+        }
         
         if (clima) {
             const iconoElement = document.getElementById('icono-clima');
@@ -124,7 +146,14 @@ async function cargarAvisos() {
             throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
         }
         
-        const data = await response.json();
+        const data = await parseJsonSafely(response);
+        
+        if (!data) {
+            console.warn('No se pudo obtener datos de avisos válidos');
+            avisos = [];
+            mostrarMensajeFallback();
+            return;
+        }
         
         // Validar que la respuesta sea un array
         if (!Array.isArray(data)) {
@@ -553,7 +582,12 @@ function iniciarPollingCambios() {
                 return;
             }
             
-            const data = await response.json();
+            const data = await parseJsonSafely(response);
+            if (!data) {
+                console.warn('No se pudo obtener hash válido');
+                return;
+            }
+            
             if (data && data.hash) {
                 if (!ultimoHashAvisos) {
                     // Primera vez, solo guardar el hash
@@ -584,7 +618,7 @@ function iniciarPollingCambios() {
     verificarCambios();
     
     // Configurar verificación cada 10 segundos para detectar cambios continuamente
-    hashPollInterval = setInterval(verificarCambios, 10000);
+    hashPollInterval = setInterval(verificarCambios, 60000);//
     
     // Verificar cambios cuando la pestaña vuelve a estar activa
     document.addEventListener('visibilitychange', () => {
