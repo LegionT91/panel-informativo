@@ -337,11 +337,11 @@ async function fetchAndRenderAvisos() {
 			// Si ambos son el mes actual, mantener orden original
 			if (isACurrent && isBCurrent) return 0;
 			
-			// Para el resto, ordenar por fecha (más recientes primero)
+			// Para el resto, ordenar por fecha (más antiguos primero)
 			if (aInfo.year !== bInfo.year) {
-				return bInfo.year - aInfo.year; // Años más recientes primero
+				return aInfo.year - bInfo.year; // Años más antiguos primero
 			}
-			return bInfo.month - aInfo.month; // Meses más recientes primero
+			return aInfo.month - bInfo.month; // Meses más antiguos primero
 		});
 		
 		console.log('Avisos procesados:', {
