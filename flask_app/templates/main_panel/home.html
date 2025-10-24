@@ -118,9 +118,9 @@
             <div class="main-card-overlay">
                 {% if main_card.id == 'empty_database' %}
                 <div class="empty-state" data-aviso-id="{{ main_card.id or '' }}">
-                    <i class="bi bi-inbox empty-icon"></i>
+                    <i class="bi bi-newspaper empty-icon"></i>
                     <div class="empty-message">{{ main_card.titulo|safe }}</div>
-                    <div class="empty-subtitle">Contacta al administrador para agregar noticias</div>
+                    <div class="empty-subtitle">El contenido se actualizará automáticamente</div>
                 </div>
                 {% elif main_card.id and main_card.id.startswith('error_') %}
                 <div class="error-state" data-aviso-id="{{ main_card.id or '' }}">

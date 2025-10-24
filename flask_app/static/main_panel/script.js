@@ -142,8 +142,10 @@ async function cargarAvisos() {
             iniciarRotacionAvisos();
         } else {
             console.warn('No hay avisos disponibles para rotación');
-            // Mostrar mensaje de fallback si no hay avisos
-            mostrarMensajeFallback();
+            // Solo mostrar mensaje de fallback si realmente no hay ningún aviso
+            if (avisos.length === 0) {
+                mostrarMensajeFallback();
+            }
         }
     } catch (error) {
         console.error('Error cargando avisos:', error);
@@ -159,12 +161,15 @@ function mostrarMensajeFallback() {
         if (mainCard && !mainCard.classList.contains('error-state') && !mainCard.classList.contains('empty-state')) {
             mainCard.innerHTML = `
                 <div class="fallback-content">
-                    <i class="bi bi-info-circle fallback-icon"></i>
-                    <div class="fallback-message">No hay noticias disponibles</div>
-                    <div class="fallback-subtitle">Las noticias se cargarán automáticamente cuando estén disponibles</div>
+                    <i class="bi bi-newspaper fallback-icon"></i>
+                    <div class="fallback-message">Esperando nuevas noticias</div>
+                    <div class="fallback-subtitle">El contenido se actualizará automáticamente</div>
                 </div>
             `;
         }
+        
+        // Asegurar que las tarjetas laterales mantengan su tamaño
+        mantenerTarjetasLaterales();
     } catch (error) {
         console.warn('Error mostrando mensaje de fallback:', error);
     }
@@ -183,8 +188,50 @@ function mostrarErrorCarga() {
                 </div>
             `;
         }
+        
+        // Asegurar que las tarjetas laterales mantengan su tamaño
+        mantenerTarjetasLaterales();
     } catch (error) {
         console.warn('Error mostrando mensaje de error:', error);
+    }
+}
+
+// Función para mantener las tarjetas laterales con su tamaño fijo
+function mantenerTarjetasLaterales() {
+    try {
+        const sideCardsContainer = document.querySelector('.side-cards');
+        if (!sideCardsContainer) return;
+        
+        const existingCards = sideCardsContainer.querySelectorAll('.side-card');
+        const cardsNeeded = 3; // Siempre mostrar 3 tarjetas laterales
+        
+        // Solo agregar placeholders si realmente no hay suficientes noticias reales
+        if (existingCards.length < cardsNeeded && avisos.length === 0) {
+            const cardsToAdd = cardsNeeded - existingCards.length;
+            
+            for (let i = 0; i < cardsToAdd; i++) {
+                const placeholderCard = document.createElement('div');
+                placeholderCard.className = 'side-card placeholder-card';
+                placeholderCard.style.backgroundImage = 'url(\'/static/main_panel/img/logo.png\')';
+                placeholderCard.innerHTML = `
+                    <div class="side-card-overlay">
+                        <div class="side-card-date">Próximamente</div>
+                        <div class="side-card-title">Nueva noticia</div>
+                    </div>
+                `;
+                sideCardsContainer.appendChild(placeholderCard);
+            }
+        }
+        
+        // Asegurar que todas las tarjetas tengan el tamaño mínimo
+        const allCards = sideCardsContainer.querySelectorAll('.side-card');
+        allCards.forEach(card => {
+            card.style.minHeight = '225px';
+            card.style.flex = '1';
+        });
+        
+    } catch (error) {
+        console.warn('Error manteniendo tarjetas laterales:', error);
     }
 }
 
@@ -205,7 +252,11 @@ function obtenerAvisosVentanaCircular(cantidadRequerida) {
 function rotarAvisos() {
     const sideCards = document.querySelectorAll('.side-card');
     
-    if (avisos.length === 0 || sideCards.length === 0) return;
+    if (avisos.length === 0 || sideCards.length === 0) {
+        // Si no hay avisos, asegurar que las tarjetas mantengan su tamaño
+        mantenerTarjetasLaterales();
+        return;
+    }
     
     // Avisos para laterales basados en ventana circular a partir del índice del principal
     const avisosUnicos = obtenerAvisosVentanaCircular(sideCards.length);
@@ -251,6 +302,49 @@ function rotarAvisos() {
                 card.style.opacity = '1';
                 card.style.transform = 'scale(1)';
             }, 300);
+        } else {
+            // Si no hay aviso específico pero hay noticias disponibles, usar la primera disponible
+            if (avisos.length > 0) {
+                const avisoDisponible = avisos[0];
+                card.style.opacity = '0.8';
+                const imgUrl = avisoDisponible.image_url && avisoDisponible.image_url.trim() !== ''
+                    ? avisoDisponible.image_url
+                    : '/static/main_panel/img/logo.png';
+                card.style.backgroundImage = `url('${imgUrl}')`;
+                
+                const overlay = card.querySelector('.side-card-overlay');
+                if (overlay) {
+                    const dateElement = overlay.querySelector('.side-card-date');
+                    const titleElement = overlay.querySelector('.side-card-title');
+                    
+                    if (dateElement) {
+                        const fechaInicio = avisoDisponible.fecha_inicio ? new Date(avisoDisponible.fecha_inicio).toLocaleDateString('es-ES') : '';
+                        const fechaFin = avisoDisponible.fecha_fin ? new Date(avisoDisponible.fecha_fin).toLocaleDateString('es-ES') : '';
+                        dateElement.textContent = fechaInicio && fechaFin ? `${fechaInicio} - ${fechaFin}` : '';
+                    }
+                    
+                    if (titleElement) {
+                        titleElement.textContent = avisoDisponible.title || '';
+                    }
+                }
+            } else {
+                // Solo mostrar placeholder si realmente no hay noticias
+                card.style.opacity = '0.6';
+                card.style.backgroundImage = 'url(\'/static/main_panel/img/logo.png\')';
+                
+                const overlay = card.querySelector('.side-card-overlay');
+                if (overlay) {
+                    const dateElement = overlay.querySelector('.side-card-date');
+                    const titleElement = overlay.querySelector('.side-card-title');
+                    
+                    if (dateElement) {
+                        dateElement.textContent = 'Próximamente';
+                    }
+                    if (titleElement) {
+                        titleElement.textContent = 'Nueva noticia';
+                    }
+                }
+            }
         }
     });
     

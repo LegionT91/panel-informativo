@@ -237,13 +237,24 @@ def register_routes(app):
                         'id': 'placeholder_0',
                     }]
             else:
-                main_card = {
-                    'titulo': 'No hay noticias disponibles<br>en la base de datos',
-                    'imagen_url': '/static/main_panel/img/logo.png',
-                    'etiqueta_fecha': '',
-                    'id': 'empty_database'
-                }
-                eventos = []
+                # Si no hay noticias activas, usar la primera disponible o mostrar mensaje solo si no hay ninguna
+                if avisos:
+                    primer_aviso = avisos[0]
+                    main_card = {
+                        'titulo': primer_aviso.get('titulo', 'Noticia disponible'),
+                        'imagen_url': primer_aviso.get('image_url', '/static/main_panel/img/logo.png'),
+                        'etiqueta_fecha': primer_aviso.get('fecha_inicio', ''),
+                        'id': primer_aviso.get('id', 'fallback')
+                    }
+                    eventos = avisos[:3]  # Usar las primeras 3 noticias disponibles
+                else:
+                    main_card = {
+                        'titulo': 'Esperando nuevas noticias<br>del Complejo Educacional',
+                        'imagen_url': '/static/main_panel/img/logo.png',
+                        'etiqueta_fecha': '',
+                        'id': 'empty_database'
+                    }
+                    eventos = []
         except Exception as e:
             error_message = str(e)
             error_type = 'database_connection'
