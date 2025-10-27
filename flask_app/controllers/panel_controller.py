@@ -171,90 +171,42 @@ def register_routes(app):
     def home():
         error_message = None
         error_type = None
+        main_card = None
+        eventos = []
+
         try:
             db = connectToMySQL(os.environ.get('DB_NAME', 'panel_informativo'))
-            all_rows = db.query_db('SELECT * FROM notice ORDER BY idnotice DESC')
-            if all_rows:
-                avisos_con_fecha = []
-                avisos_sin_fecha = []
-                for r in all_rows:
-                    if r.get('start_date'):
-                        avisos_con_fecha.append(r)
-                    else:
-                        avisos_sin_fecha.append(r)
-                now = datetime.now()
+            # Obtener las últimas 4 noticias ordenadas por fecha de inicio
+            noticias = db.query_db('SELECT * FROM notice ORDER BY start_date ASC LIMIT 4')
+            
+            if noticias:
+                # Procesar la noticia principal (primera)
+                noticia_principal = noticias[0]
+                main_card = {
+                    'titulo': noticia_principal.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
+                    'imagen_url': build_image_url(noticia_principal.get('image_url')) or '/static/main_panel/img/logo.png',
+                    'id': str(noticia_principal.get('idnotice')),
+                    'etiqueta_fecha': humanize_main_date(noticia_principal.get('start_date'))
+                }
 
-                def calcular_proximidad(aviso):
-                    try:
-                        fecha_inicio = aviso.get('start_date')
-                        if fecha_inicio:
-                            if isinstance(fecha_inicio, str):
-                                fecha_inicio = datetime.fromisoformat(fecha_inicio.replace('T', ' '))
-                            diff = abs((fecha_inicio - now).days)
-                            return diff if fecha_inicio >= now else diff + 1000
-                        return 9999
-                    except Exception:
-                        return 9999
-
-                avisos_con_fecha.sort(key=calcular_proximidad)
-                avisos_ordenados = avisos_con_fecha[:4]
-                if len(avisos_ordenados) < 4:
-                    faltan = 4 - len(avisos_ordenados)
-                    avisos_ordenados = avisos_ordenados + avisos_sin_fecha[:faltan]
-
-                if avisos_ordenados:
-                    r = avisos_ordenados[0]
-                    imagen_main = build_image_url(r.get('image_url')) if r.get('image_url') else '/static/main_panel/img/logo.png'
-                    main_card = {
-                        'titulo': r.get('name_notice', 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!'),
-                        'imagen_url': imagen_main,
-                        'id': str(r.get('idnotice')),
-                        'etiqueta_fecha': humanize_main_date(r.get('start_date')),
-                    }
-                    eventos = []
-                    main_card_id = r.get('idnotice')
-                    for r in avisos_ordenados[1:]:
-                        if len(eventos) >= 3:
-                            break
-                        if r.get('idnotice') != main_card_id:
-                            eventos.append({
-                                'titulo': r.get('name_notice', ''),
-                                'fecha_inicio': fmt_field_display(r.get('start_date')),
-                                'fecha_fin': fmt_field_display(r.get('end_date')),
-                                'imagen_url': (build_image_url(r.get('image_url')) if r.get('image_url') else '/static/main_panel/img/logo.png'),
-                                'id': str(r.get('idnotice')),
-                            })
-                else:
-                    main_card = {
-                        'titulo': 'Se acerca el 18, con ello<br>actividades recreativas<br>¡Pasalo chancho!',
-                        'imagen_url': 'https://storage.googleapis.com/chile-travel-cdn/2021/03/fiestas-patrias-shutterstock_703979611.jpg',
-                    }
-                    eventos = [{
-                        'titulo': 'Próximamente más noticias',
-                        'fecha_inicio': '',
-                        'fecha_fin': '',
-                        'imagen_url': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=400&q=80',
-                        'id': 'placeholder_0',
-                    }]
+                # Procesar las noticias secundarias (hasta 3)
+                for noticia in noticias[1:]:
+                    eventos.append({
+                        'titulo': noticia.get('name_notice', ''),
+                        'fecha_inicio': fmt_field_display(noticia.get('start_date')),
+                        'fecha_fin': fmt_field_display(noticia.get('end_date')),
+                        'imagen_url': build_image_url(noticia.get('image_url')) or '/static/main_panel/img/logo.png',
+                        'id': str(noticia.get('idnotice'))
+                    })
             else:
-                # Si no hay noticias activas, usar la primera disponible o mostrar mensaje solo si no hay ninguna
-                if avisos:
-                    primer_aviso = avisos[0]
-                    main_card = {
-                        'titulo': primer_aviso.get('titulo', 'Noticia disponible'),
-                        'imagen_url': primer_aviso.get('image_url', '/static/main_panel/img/logo.png'),
-                        'etiqueta_fecha': primer_aviso.get('fecha_inicio', ''),
-                        'id': primer_aviso.get('id', 'fallback')
-                    }
-                    eventos = avisos[:3]  # Usar las primeras 3 noticias disponibles
-                else:
-                    main_card = {
-                        'titulo': 'Esperando nuevas noticias<br>del Complejo Educacional',
-                        'imagen_url': '/static/main_panel/img/logo.png',
-                        'etiqueta_fecha': '',
-                        'id': 'empty_database'
-                    }
-                    eventos = []
+                # Si no hay noticias, mostrar contenido por defecto
+                main_card = {
+                    'titulo': 'Esperando nuevas noticias<br>del Complejo Educacional',
+                    'imagen_url': '/static/main_panel/img/logo.png',
+                    'etiqueta_fecha': '',
+                    'id': 'empty_database'
+                }
+
         except Exception as e:
             error_message = str(e)
             error_type = 'database_connection'
@@ -282,7 +234,6 @@ def register_routes(app):
                 'etiqueta_fecha': '',
                 'id': f'error_{error_type}'
             }
-            eventos = []
 
         try:
             clima = obtener_clima_nueva_imperial()
